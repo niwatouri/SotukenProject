@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.load {
+  font-size: 50px;
+  margin-left: 35px;
+  font-family: "DotGothic16", sans-serif;
+}
