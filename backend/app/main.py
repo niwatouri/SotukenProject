@@ -32,7 +32,7 @@ async def scan(request: Request):
 
     # POSTリクエストの処理
     data = await request.json()
-    url = data.get("url") 
+    url = data.get("url")
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(f"{ZAP_SCANNER_URL}/scan", json={"url": url})
@@ -70,7 +70,7 @@ def start_scan(request: Request):
     url = asyncio.run(get_url())
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
-    
+
     job = q.enqueue(zap_scan_task, url)
     return {"job_id": job.get_id()}
 
