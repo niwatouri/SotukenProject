@@ -10,5 +10,3 @@ if __name__ == '__main__':
     with Connection(redis_conn):
         worker = Worker(list(map(Queue, listen)))
         worker.work()
-
-# hogehogefugafuga
