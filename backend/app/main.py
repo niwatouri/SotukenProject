@@ -6,17 +6,19 @@ import httpx
 import os
 import json
 from app.tasks import zap_scan_task
+from rq.job import Job
 
 app = FastAPI()
 
+# Redis接続
 redis_conn = Redis(host="redis", port=6379)
 q = Queue(connection=redis_conn)
 
-
-# CORS設定（開発時のみ。必要に応じて制限してください）
+# --- ✅ CORS設定 ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],            # 本番は必要に応じて制限推奨
+    allow_origins=["http://localhost", "http://localhost:3000", "*"],  # 必要に応じて制限
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -24,15 +26,15 @@ app.add_middleware(
 ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
 REPORT_PATH = "/reports/zap_report.json"
 
-@app.api_route("/scan", methods=["POST", "OPTIONS"])
-async def scan(request: Request):
-    if request.method == "OPTIONS":
-        # CORSプリフライトの応答として空を返す
-        return {}
 
-    # POSTリクエストの処理
+# --- ✅ /scan エンドポイント ---
+@app.post("/scan")
+async def scan(request: Request):
     data = await request.json()
-    url = data.get("url") 
+    url = data.get("url")
+
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(f"{ZAP_SCANNER_URL}/scan", json={"url": url})
@@ -40,6 +42,8 @@ async def scan(request: Request):
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
         return resp.json()
 
+
+# --- レポート取得 ---
 @app.get("/report")
 def get_report():
     try:
@@ -49,31 +53,30 @@ def get_report():
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Report not found")
 
+
+# --- AIアドバイス仮実装 ---
 @app.post("/advice")
 async def get_advice(request: Request):
     data = await request.json()
-    # ここは仮実装です
     return {
         "advice": "これはAIによる仮のアドバイスです",
         "based_on": data
     }
 
-from rq.job import Job
 
+# --- RQタスク登録 ---
 @app.post("/start-scan/")
-def start_scan(request: Request):
-    import asyncio
-    async def get_url():
-        data = await request.json()
-        return data.get("url")
-
-    url = asyncio.run(get_url())
+async def start_scan(request: Request):
+    data = await request.json()
+    url = data.get("url")
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
     
     job = q.enqueue(zap_scan_task, url)
     return {"job_id": job.get_id()}
 
+
+# --- RQ結果取得 ---
 @app.get("/scan-result/{job_id}")
 def get_scan_result(job_id: str):
     try:
@@ -82,6 +85,6 @@ def get_scan_result(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
 
     return {
-        "status": job.get_status(),  # queued, started, finished, failed
+        "status": job.get_status(),
         "result": job.result if job.is_finished else None
     }
