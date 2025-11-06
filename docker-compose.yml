@@ -46,7 +46,7 @@ services:
     build: ./frontend
     container_name: frontend
     ports:
-      - "80:80"  # または 3000:80 に変更可能
+      - "80:80" # または 3000:80 に変更可能
     environment:
       - VITE_API_URL=http://backend:8000
     depends_on:
@@ -76,7 +76,7 @@ services:
   worker:
     build: ./backend
     container_name: rq-worker
-    command: ["python", "app/worker.py"]
+    command: [ "python", "app/worker.py" ]
     depends_on:
       - backend
       - redis
@@ -116,6 +116,7 @@ services:
 
 volumes:
   postgres-data:
+
 
 networks:
   zapnet:
