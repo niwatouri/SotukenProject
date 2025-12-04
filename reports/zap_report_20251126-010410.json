@@ -1,8 +1,8 @@
 {
 	"@programName": "ZAP",
 	"@version": "2.16.1",
-	"@generated": "Thu, 30 Oct 2025 01:53:46",
-	"created": "2025-10-30T01:53:46.314743830Z",
+	"@generated": "Wed, 26 Nov 2025 01:04:10",
+	"created": "2025-11-26T01:04:10.243322064Z",
 	"site":[ 
 		{
 			"@name": "http://example.com",
@@ -23,6 +23,7 @@
 						{
 							"id": "3",
 							"uri": "http://example.com",
+							"nodeName": null,
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -30,8 +31,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "1",
+							"id": "0",
 							"uri": "http://example.com/robots.txt",
+							"nodeName": null,
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -39,8 +41,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "5",
+							"id": "2",
 							"uri": "http://example.com/sitemap.xml",
+							"nodeName": null,
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -49,12 +52,13 @@
 						}
 					],
 					"count": "3",
+					"systemic": false,
 					"solution": "<p>Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.</p>",
 					"otherinfo": "",
 					"reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP</p><p>https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html</p><p>https://www.w3.org/TR/CSP/</p><p>https://w3c.github.io/webappsec-csp/</p><p>https://web.dev/articles/csp</p><p>https://caniuse.com/#feat=contentsecuritypolicy</p><p>https://content-security-policy.com/</p>",
 					"cweid": "693",
 					"wascid": "15",
-					"sourceid": "7"
+					"sourceid": "4"
 				},
 				{
 					"pluginid": "10020",
@@ -67,8 +71,9 @@
 					"desc": "<p>The response does not protect against 'ClickJacking' attacks. It should include either Content-Security-Policy with 'frame-ancestors' directive or X-Frame-Options.</p>",
 					"instances":[ 
 						{
-							"id": "7",
+							"id": "1",
 							"uri": "http://example.com",
+							"nodeName": null,
 							"method": "GET",
 							"param": "x-frame-options",
 							"attack": "",
@@ -77,12 +82,13 @@
 						}
 					],
 					"count": "1",
+					"systemic": false,
 					"solution": "<p>Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app.</p><p>If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's \"frame-ancestors\" directive.</p>",
 					"otherinfo": "",
 					"reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Frame-Options</p>",
 					"cweid": "1021",
 					"wascid": "15",
-					"sourceid": "141"
+					"sourceid": "4"
 				},
 				{
 					"pluginid": "10021",
@@ -97,6 +103,7 @@
 						{
 							"id": "4",
 							"uri": "http://example.com",
+							"nodeName": null,
 							"method": "GET",
 							"param": "x-content-type-options",
 							"attack": "",
@@ -105,12 +112,13 @@
 						}
 					],
 					"count": "1",
+					"systemic": false,
 					"solution": "<p>Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages.</p><p>If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing.</p>",
 					"otherinfo": "<p>This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.</p><p>At \"High\" threshold this scan rule will not alert on client or server error responses.</p>",
 					"reference": "<p>https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85)</p><p>https://owasp.org/www-community/Security_Headers</p>",
 					"cweid": "693",
 					"wascid": "15",
-					"sourceid": "7"
+					"sourceid": "4"
 				}
 			]
 		}

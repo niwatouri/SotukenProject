@@ -3,7 +3,9 @@ import os
 from redis import Redis
 from rq import Worker, Queue, Connection
 
+# Listen queues
 listen = ['default']
+
 redis_conn = Redis(host="redis", port=6379)
 
 if __name__ == '__main__':

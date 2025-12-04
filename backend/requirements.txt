@@ -4,3 +4,4 @@ requests
 httpx
 redis 
 rq==1.15.1
+python-dotenv

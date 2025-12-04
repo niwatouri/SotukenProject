@@ -23,7 +23,11 @@ export interface ScanResults {
 interface ScanContextType {
   scanResults: ScanResults | null;
   isScanning: boolean;
-  startScan: (url: string, scanType: 'bulk' | 'detailed', options?: string[]) => Promise<void>;
+  startScan: (
+    url: string,
+    scanType: 'bulk' | 'detailed',
+    options?: string[]
+  ) => Promise<void>;
   clearResults: () => void;
 }
 
@@ -33,6 +37,30 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
+  // -------------------------------------------------------------
+  // 🔁 追加：ジョブ結果ポーリング
+  // -------------------------------------------------------------
+  const pollJobResult = async (jobId: string) => {
+    while (true) {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/scan-result/${jobId}`
+      );
+      const data = await res.json();
+
+      console.log("⏳ ジョブ状態:", data);
+
+      if (data.status === "finished") {
+        return data.result;
+      }
+
+      // 2秒待つ
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  };
+
+  // -------------------------------------------------------------
+  // 🟦 startScan を非同期ジョブ版に変更
+  // -------------------------------------------------------------
   const startScan = async (
     url: string,
     scanType: 'bulk' | 'detailed',
@@ -41,48 +69,41 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     setIsScanning(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/scan`, {
+      // ① ジョブ開始 API（同期スキャンから置き換え）
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/start-scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          url,
-          scanType,
-          options,
-        }),
+        body: JSON.stringify({ url }),
       });
 
       if (!response.ok) {
-        throw new Error(`スキャン失敗: ${response.statusText}`);
+        throw new Error(`ジョブ開始失敗: ${response.statusText}`);
       }
 
-      const result = await response.json();
-      console.log('✅ スキャン開始成功:', result);
+      const { job_id } = await response.json();
+      console.log('🎉 ジョブ開始:', job_id);
 
-      // レポート取得（オプション：必要であれば）
-      const reportRes = await fetch(`${import.meta.env.VITE_API_URL}/report`);
-      if (!reportRes.ok) {
-        throw new Error(`レポート取得失敗: ${reportRes.statusText}`);
-      }
+      // ② ポーリングして完了を待つ
+      const zapResult = await pollJobResult(job_id);
+      console.log('📄 ZAP スキャン結果:', zapResult);
 
-      const reportData = await reportRes.json();
-      console.log('📄 レポート取得:', reportData);
-
-      // 必要な形式に変換（ZAPレポート形式に応じて調整すること）
+      // --- ↓ ここは必要に応じて ZAP レポートに合わせて編集 ---
       const parsedResult: ScanResults = {
         timestamp: new Date().toISOString(),
         targetUrl: url,
         scanType,
-        openPorts: [], // ← ポート情報があるならパースして入れて
-        vulnerabilities: [], // ← レポートの内容に合わせてマッピング
-        riskScore: 75, // 仮の値
+        openPorts: [],
+        vulnerabilities: [],
+        riskScore: 75,
       };
+      // -------------------------------------------------------------
 
       setScanResults(parsedResult);
     } catch (error) {
       console.error('❌ スキャン中エラー:', error);
-      alert('スキャンに失敗しました。もう一度お試しください。');
+      alert('スキャンに失敗しました。');
     } finally {
       setIsScanning(false);
     }

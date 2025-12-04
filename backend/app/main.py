@@ -1,3 +1,4 @@
+# backend/main.py
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
@@ -7,27 +8,36 @@ import os
 import json
 from app.tasks import zap_scan_task
 from rq.job import Job
+from dotenv import load_dotenv
 
+# --- Load environment variables ---
+load_dotenv()
+
+# ZAP Scanner URL
+ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
+print("Loaded ZAP_SCANNER_URL =", ZAP_SCANNER_URL)
+
+# --- FastAPI app ---
 app = FastAPI()
 
-# Redis接続
+# --- Redis Queue ---
 redis_conn = Redis(host="redis", port=6379)
 q = Queue(connection=redis_conn)
 
-# --- ✅ CORS設定 ---
+# --- CORS settings ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://localhost:3000", "*"],  # 必要に応じて制限
+    allow_origins=["http://localhost", "http://localhost:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
+# Report path
 REPORT_PATH = "/reports/zap_report.json"
 
 
-# --- ✅ /scan エンドポイント ---
+# --- Direct ZAP scan ---
 @app.post("/scan")
 async def scan(request: Request):
     data = await request.json()
@@ -36,14 +46,21 @@ async def scan(request: Request):
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{ZAP_SCANNER_URL}/scan", json={"url": url})
+    timeout = httpx.Timeout(600.0)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            resp = await client.post(f"{ZAP_SCANNER_URL}/scan", json={"url": url})
+        except httpx.ReadTimeout:
+            raise HTTPException(status_code=504, detail="ZAP scan timeout")
+
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
+
         return resp.json()
 
 
-# --- レポート取得 ---
+# --- Read Report File ---
 @app.get("/report")
 def get_report():
     try:
@@ -54,7 +71,7 @@ def get_report():
         raise HTTPException(status_code=404, detail="Report not found")
 
 
-# --- AIアドバイス仮実装 ---
+# --- Dummy AI Advice ---
 @app.post("/advice")
 async def get_advice(request: Request):
     data = await request.json()
@@ -64,19 +81,21 @@ async def get_advice(request: Request):
     }
 
 
-# --- RQタスク登録 ---
+# --- Start background scan using RQ ---
 @app.post("/start-scan/")
 async def start_scan(request: Request):
     data = await request.json()
     url = data.get("url")
+
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
-    
+
+    # ジョブを enqueue
     job = q.enqueue(zap_scan_task, url)
     return {"job_id": job.get_id()}
 
 
-# --- RQ結果取得 ---
+# --- Check background scan result ---
 @app.get("/scan-result/{job_id}")
 def get_scan_result(job_id: str):
     try:

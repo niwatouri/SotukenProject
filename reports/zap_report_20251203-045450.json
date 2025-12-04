@@ -1,0 +1,4467 @@
+{
+	"@programName": "ZAP",
+	"@version": "2.16.1",
+	"@generated": "Wed, 3 Dec 2025 04:54:49",
+	"created": "2025-12-03T04:54:49.859907626Z",
+	"site":[ 
+		{
+			"@name": "http://example.com",
+			"@host": "example.com",
+			"@port": "80",
+			"@ssl": "false",
+			"alerts": [ 
+				{
+					"pluginid": "10038",
+					"alertRef": "10038-1",
+					"alert": "Content Security Policy (CSP) Header Not Set",
+					"name": "Content Security Policy (CSP) Header Not Set",
+					"riskcode": "2",
+					"confidence": "3",
+					"riskdesc": "Medium (High)",
+					"desc": "<p>Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks, including Cross Site Scripting (XSS) and data injection attacks. These attacks are used for everything from data theft to site defacement or distribution of malware. CSP provides a set of standard HTTP headers that allow website owners to declare approved sources of content that browsers should be allowed to load on that page \u2014 covered types are JavaScript, CSS, HTML frames, fonts, images and embeddable objects such as Java applets, ActiveX, audio and video files.</p>",
+					"instances":[ 
+						{
+							"id": "454",
+							"uri": "http://example.com/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "451",
+							"uri": "http://example.com/robots.txt",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "452",
+							"uri": "http://example.com/sitemap.xml",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						}
+					],
+					"count": "3",
+					"systemic": false,
+					"solution": "<p>Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.</p>",
+					"otherinfo": "",
+					"reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP</p><p>https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html</p><p>https://www.w3.org/TR/CSP/</p><p>https://w3c.github.io/webappsec-csp/</p><p>https://web.dev/articles/csp</p><p>https://caniuse.com/#feat=contentsecuritypolicy</p><p>https://content-security-policy.com/</p>",
+					"cweid": "693",
+					"wascid": "15",
+					"sourceid": "2299"
+				},
+				{
+					"pluginid": "10020",
+					"alertRef": "10020-1",
+					"alert": "Missing Anti-clickjacking Header",
+					"name": "Missing Anti-clickjacking Header",
+					"riskcode": "2",
+					"confidence": "2",
+					"riskdesc": "Medium (Medium)",
+					"desc": "<p>The response does not protect against 'ClickJacking' attacks. It should include either Content-Security-Policy with 'frame-ancestors' directive or X-Frame-Options.</p>",
+					"instances":[ 
+						{
+							"id": "453",
+							"uri": "http://example.com/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						}
+					],
+					"count": "1",
+					"systemic": false,
+					"solution": "<p>Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app.</p><p>If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's \"frame-ancestors\" directive.</p>",
+					"otherinfo": "",
+					"reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Frame-Options</p>",
+					"cweid": "1021",
+					"wascid": "15",
+					"sourceid": "2299"
+				},
+				{
+					"pluginid": "10021",
+					"alertRef": "10021",
+					"alert": "X-Content-Type-Options Header Missing",
+					"name": "X-Content-Type-Options Header Missing",
+					"riskcode": "1",
+					"confidence": "2",
+					"riskdesc": "Low (Medium)",
+					"desc": "<p>The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'. This allows older versions of Internet Explorer and Chrome to perform MIME-sniffing on the response body, potentially causing the response body to be interpreted and displayed as a content type other than the declared content type. Current (early 2014) and legacy versions of Firefox will use the declared content type (if one is set), rather than performing MIME-sniffing.</p>",
+					"instances":[ 
+						{
+							"id": "455",
+							"uri": "http://example.com/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						}
+					],
+					"count": "1",
+					"systemic": false,
+					"solution": "<p>Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages.</p><p>If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing.</p>",
+					"otherinfo": "<p>This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.</p><p>At \"High\" threshold this scan rule will not alert on client or server error responses.</p>",
+					"reference": "<p>https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85)</p><p>https://owasp.org/www-community/Security_Headers</p>",
+					"cweid": "693",
+					"wascid": "15",
+					"sourceid": "2299"
+				}
+			]
+		},
+		{
+			"@name": "http://testphp.vulnweb.com",
+			"@host": "testphp.vulnweb.com",
+			"@port": "80",
+			"@ssl": "false",
+			"alerts": [ 
+				{
+					"pluginid": "40012",
+					"alertRef": "40012",
+					"alert": "Cross Site Scripting (Reflected)",
+					"name": "Cross Site Scripting (Reflected)",
+					"riskcode": "3",
+					"confidence": "2",
+					"riskdesc": "High (Medium)",
+					"desc": "<p>Cross-site Scripting (XSS) is an attack technique that involves echoing attacker-supplied code into a user's browser instance. A browser instance can be a standard web browser client, or a browser object embedded in a software product such as the browser within WinAmp, an RSS reader, or an email client. The code itself is usually written in HTML/JavaScript, but may also extend to VBScript, ActiveX, Java, Flash, or any other browser-supported technology.</p><p>When an attacker gets a user's browser to execute his/her code, the code will run within the security context (or zone) of the hosting web site. With this level of privilege, the code has the ability to read, modify and transmit any sensitive data accessible by the browser. A Cross-site Scripted user could have his/her account hijacked (cookie theft), their browser redirected to another location, or possibly shown fraudulent content delivered by the web site they are visiting. Cross-site Scripting attacks essentially compromise the trust relationship between a user and the web site. Applications utilizing browser object instances which load content from the file system may execute code under the local machine zone allowing for system compromise.</p><p></p><p>There are three types of Cross-site Scripting attacks: non-persistent, persistent and DOM-based.</p><p>Non-persistent attacks and DOM-based attacks require a user to either visit a specially crafted link laced with malicious code, or visit a malicious web page containing a web form, which when posted to the vulnerable site, will mount the attack. Using a malicious form will oftentimes take place when the vulnerable resource only accepts HTTP POST requests. In such a case, the form can be submitted automatically, without the victim's knowledge (e.g. by using JavaScript). Upon clicking on the malicious link or submitting the malicious form, the XSS payload will get echoed back and will get interpreted by the user's browser and execute. Another technique to send almost arbitrary requests (GET and POST) is by using an embedded client, such as Adobe Flash.</p><p>Persistent attacks occur when the malicious code is submitted to a web site where it's stored for a period of time. Examples of an attacker's favorite targets often include message board posts, web mail messages, and web chat software. The unsuspecting user is not required to interact with any additional site/link (e.g. an attacker site or a malicious link sent via email), just simply view the web page containing the code.</p>",
+					"instances":[ 
+						{
+							"id": "429",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E",
+							"nodeName": null,
+							"method": "GET",
+							"param": "artist",
+							"attack": "<scrIpt>alert(1);</scRipt>",
+							"evidence": "<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "436",
+							"uri": "http://testphp.vulnweb.com/hpp/?pp=%22+onMouseOver%3D%22alert%281%29%3B",
+							"nodeName": null,
+							"method": "GET",
+							"param": "pp",
+							"attack": "\" onMouseOver=\"alert(1);",
+							"evidence": "\" onMouseOver=\"alert(1);",
+							"otherinfo": ""
+						},
+						{
+							"id": "430",
+							"uri": "http://testphp.vulnweb.com/hpp/params.php?p=%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E&pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "p",
+							"attack": "<scrIpt>alert(1);</scRipt>",
+							"evidence": "<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "435",
+							"uri": "http://testphp.vulnweb.com/hpp/params.php?p=valid&pp=%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E",
+							"nodeName": null,
+							"method": "GET",
+							"param": "pp",
+							"attack": "<scrIpt>alert(1);</scRipt>",
+							"evidence": "<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "431",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E",
+							"nodeName": null,
+							"method": "GET",
+							"param": "artist",
+							"attack": "<scrIpt>alert(1);</scRipt>",
+							"evidence": "<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "432",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E",
+							"nodeName": null,
+							"method": "GET",
+							"param": "cat",
+							"attack": "<scrIpt>alert(1);</scRipt>",
+							"evidence": "<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "433",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E",
+							"nodeName": null,
+							"method": "GET",
+							"param": "pic",
+							"attack": "<scrIpt>alert(1);</scRipt>",
+							"evidence": "<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "423",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "name",
+							"attack": "</strong><scrIpt>alert(1);</scRipt><strong>",
+							"evidence": "</strong><scrIpt>alert(1);</scRipt><strong>",
+							"otherinfo": ""
+						},
+						{
+							"id": "425",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "text",
+							"attack": "</td><scrIpt>alert(1);</scRipt><td>",
+							"evidence": "</td><scrIpt>alert(1);</scRipt><td>",
+							"otherinfo": ""
+						},
+						{
+							"id": "424",
+							"uri": "http://testphp.vulnweb.com/search.php?test=%27%22%3CscrIpt%3Ealert%281%29%3B%3C%2FscRipt%3E",
+							"nodeName": null,
+							"method": "POST",
+							"param": "test",
+							"attack": "'\"<scrIpt>alert(1);</scRipt>",
+							"evidence": "'\"<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "427",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "searchFor",
+							"attack": "</h2><scrIpt>alert(1);</scRipt><h2>",
+							"evidence": "</h2><scrIpt>alert(1);</scRipt><h2>",
+							"otherinfo": ""
+						},
+						{
+							"id": "437",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "ucc",
+							"attack": "</li><scrIpt>alert(1);</scRipt><li>",
+							"evidence": "</li><scrIpt>alert(1);</scRipt><li>",
+							"otherinfo": ""
+						},
+						{
+							"id": "438",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "uemail",
+							"attack": "</li><scrIpt>alert(1);</scRipt><li>",
+							"evidence": "</li><scrIpt>alert(1);</scRipt><li>",
+							"otherinfo": ""
+						},
+						{
+							"id": "439",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "uphone",
+							"attack": "</li><scrIpt>alert(1);</scRipt><li>",
+							"evidence": "</li><scrIpt>alert(1);</scRipt><li>",
+							"otherinfo": ""
+						},
+						{
+							"id": "434",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "urname",
+							"attack": "</li><scrIpt>alert(1);</scRipt><li>",
+							"evidence": "</li><scrIpt>alert(1);</scRipt><li>",
+							"otherinfo": ""
+						},
+						{
+							"id": "422",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "uuname",
+							"attack": "</li><scrIpt>alert(1);</scRipt><li>",
+							"evidence": "</li><scrIpt>alert(1);</scRipt><li>",
+							"otherinfo": ""
+						},
+						{
+							"id": "428",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "pass",
+							"attack": "'\"<scrIpt>alert(1);</scRipt>",
+							"evidence": "'\"<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						},
+						{
+							"id": "426",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "uname",
+							"attack": "'\"<scrIpt>alert(1);</scRipt>",
+							"evidence": "'\"<scrIpt>alert(1);</scRipt>",
+							"otherinfo": ""
+						}
+					],
+					"count": "18",
+					"systemic": false,
+					"solution": "<p>Phase: Architecture and Design</p><p>Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid.</p><p>Examples of libraries and frameworks that make it easier to generate properly encoded output include Microsoft's Anti-XSS library, the OWASP ESAPI Encoding module, and Apache Wicket.</p><p></p><p>Phases: Implementation; Architecture and Design</p><p>Understand the context in which your data will be used and the encoding that will be expected. This is especially important when transmitting data between different components, or when generating outputs that can contain multiple encodings at the same time, such as web pages or multi-part mail messages. Study all expected communication protocols and data representations to determine the required encoding strategies.</p><p>For any data that will be output to another web page, especially any data that was received from external inputs, use the appropriate encoding on all non-alphanumeric characters.</p><p>Consult the XSS Prevention Cheat Sheet for more details on the types of encoding and escaping that are needed.</p><p></p><p>Phase: Architecture and Design</p><p>For any security checks that are performed on the client side, ensure that these checks are duplicated on the server side, in order to avoid CWE-602. Attackers can bypass the client-side checks by modifying values after the checks have been performed, or by changing the client to remove the client-side checks entirely. Then, these modified values would be submitted to the server.</p><p></p><p>If available, use structured mechanisms that automatically enforce the separation between data and code. These mechanisms may be able to provide the relevant quoting, encoding, and validation automatically, instead of relying on the developer to provide this capability at every point where output is generated.</p><p></p><p>Phase: Implementation</p><p>For every web page that is generated, use and specify a character encoding such as ISO-8859-1 or UTF-8. When an encoding is not specified, the web browser may choose a different encoding by guessing which encoding is actually being used by the web page. This can cause the web browser to treat certain sequences as special, opening up the client to subtle XSS attacks. See CWE-116 for more mitigations related to encoding/escaping.</p><p></p><p>To help mitigate XSS attacks against the user's session cookie, set the session cookie to be HttpOnly. In browsers that support the HttpOnly feature (such as more recent versions of Internet Explorer and Firefox), this attribute can prevent the user's session cookie from being accessible to malicious client-side scripts that use document.cookie. This is not a complete solution, since HttpOnly is not supported by all browsers. More importantly, XMLHTTPRequest and other powerful browser technologies provide read access to HTTP headers, including the Set-Cookie header in which the HttpOnly flag is set.</p><p></p><p>Assume all input is malicious. Use an \"accept known good\" input validation strategy, i.e., use an allow list of acceptable inputs that strictly conform to specifications. Reject any input that does not strictly conform to specifications, or transform it into something that does. Do not rely exclusively on looking for malicious or malformed inputs (i.e., do not rely on a deny list). However, deny lists can be useful for detecting potential attacks or determining which inputs are so malformed that they should be rejected outright.</p><p></p><p>When performing input validation, consider all potentially relevant properties, including length, type of input, the full range of acceptable values, missing or extra inputs, syntax, consistency across related fields, and conformance to business rules. As an example of business rule logic, \"boat\" may be syntactically valid because it only contains alphanumeric characters, but it is not valid if you are expecting colors such as \"red\" or \"blue.\"</p><p></p><p>Ensure that you perform input validation at well-defined interfaces within the application. This will help protect the application even if a component is reused or moved elsewhere.</p><p>\t</p>",
+					"otherinfo": "",
+					"reference": "<p>https://owasp.org/www-community/attacks/xss/</p><p>https://cwe.mitre.org/data/definitions/79.html</p>",
+					"cweid": "79",
+					"wascid": "8",
+					"sourceid": "1697"
+				},
+				{
+					"pluginid": "40018",
+					"alertRef": "40018",
+					"alert": "SQL Injection",
+					"name": "SQL Injection",
+					"riskcode": "3",
+					"confidence": "2",
+					"riskdesc": "High (Medium)",
+					"desc": "<p>SQL injection may be possible.</p>",
+					"instances":[ 
+						{
+							"id": "449",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "submit",
+							"attack": "add message OR 1=1 -- ",
+							"evidence": "",
+							"otherinfo": "The page results were successfully manipulated using the boolean conditions [add message AND 1=1 -- ] and [add message OR 1=1 -- ]\nThe parameter value being modified was stripped from the HTML output for the purposes of the comparison.\nData was NOT returned for the original parameter.\nThe vulnerability was detected by successfully retrieving more data than originally returned, by manipulating the parameter."
+						},
+						{
+							"id": "450",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "urname",
+							"attack": "ZAP' OR '1'='1' -- ",
+							"evidence": "",
+							"otherinfo": "The page results were successfully manipulated using the boolean conditions [ZAP' AND '1'='1' -- ] and [ZAP' OR '1'='1' -- ]\nThe parameter value being modified was stripped from the HTML output for the purposes of the comparison.\nData was NOT returned for the original parameter.\nThe vulnerability was detected by successfully retrieving more data than originally returned, by manipulating the parameter."
+						}
+					],
+					"count": "2",
+					"systemic": false,
+					"solution": "<p>Do not trust client side input, even if there is client side validation in place.</p><p>In general, type check all data on the server side.</p><p>If the application uses JDBC, use PreparedStatement or CallableStatement, with parameters passed by '?'</p><p>If the application uses ASP, use ADO Command Objects with strong type checking and parameterized queries.</p><p>If database Stored Procedures can be used, use them.</p><p>Do *not* concatenate strings into queries in the stored procedure, or use 'exec', 'exec immediate', or equivalent functionality!</p><p>Do not create dynamic SQL queries using simple string concatenation.</p><p>Escape all data received from the client.</p><p>Apply an 'allow list' of allowed characters, or a 'deny list' of disallowed characters in user input.</p><p>Apply the principle of least privilege by using the least privileged database user possible.</p><p>In particular, avoid using the 'sa' or 'db-owner' database users. This does not eliminate SQL injection, but minimizes its impact.</p><p>Grant the minimum database access that is necessary for the application.</p>",
+					"otherinfo": "<p>The page results were successfully manipulated using the boolean conditions [add message AND 1=1 -- ] and [add message OR 1=1 -- ]</p><p>The parameter value being modified was stripped from the HTML output for the purposes of the comparison.</p><p>Data was NOT returned for the original parameter.</p><p>The vulnerability was detected by successfully retrieving more data than originally returned, by manipulating the parameter.</p>",
+					"reference": "<p>https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html</p>",
+					"cweid": "89",
+					"wascid": "19",
+					"sourceid": "2258"
+				},
+				{
+					"pluginid": "40018",
+					"alertRef": "40018",
+					"alert": "SQL Injection - MySQL",
+					"name": "SQL Injection - MySQL",
+					"riskcode": "3",
+					"confidence": "2",
+					"riskdesc": "High (Medium)",
+					"desc": "<p>SQL injection may be possible.</p>",
+					"instances":[ 
+						{
+							"id": "445",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=%27",
+							"nodeName": null,
+							"method": "GET",
+							"param": "artist",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "446",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=%27",
+							"nodeName": null,
+							"method": "GET",
+							"param": "artist",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "447",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=%27",
+							"nodeName": null,
+							"method": "GET",
+							"param": "cat",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "448",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=%27",
+							"nodeName": null,
+							"method": "GET",
+							"param": "pic",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "441",
+							"uri": "http://testphp.vulnweb.com/search.php?test=%27",
+							"nodeName": null,
+							"method": "POST",
+							"param": "test",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "444",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "searchFor",
+							"attack": "ZAP'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "440",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "uuname",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "443",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "pass",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						},
+						{
+							"id": "442",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "uname",
+							"attack": "'",
+							"evidence": "You have an error in your SQL syntax",
+							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
+						}
+					],
+					"count": "9",
+					"systemic": false,
+					"solution": "<p>Do not trust client side input, even if there is client side validation in place.</p><p>In general, type check all data on the server side.</p><p>If the application uses JDBC, use PreparedStatement or CallableStatement, with parameters passed by '?'</p><p>If the application uses ASP, use ADO Command Objects with strong type checking and parameterized queries.</p><p>If database Stored Procedures can be used, use them.</p><p>Do *not* concatenate strings into queries in the stored procedure, or use 'exec', 'exec immediate', or equivalent functionality!</p><p>Do not create dynamic SQL queries using simple string concatenation.</p><p>Escape all data received from the client.</p><p>Apply an 'allow list' of allowed characters, or a 'deny list' of disallowed characters in user input.</p><p>Apply the principle of least privilege by using the least privileged database user possible.</p><p>In particular, avoid using the 'sa' or 'db-owner' database users. This does not eliminate SQL injection, but minimizes its impact.</p><p>Grant the minimum database access that is necessary for the application.</p>",
+					"otherinfo": "<p>RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.</p><p>The vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised.</p>",
+					"reference": "<p>https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html</p>",
+					"cweid": "89",
+					"wascid": "19",
+					"sourceid": "1954"
+				},
+				{
+					"pluginid": "10202",
+					"alertRef": "10202",
+					"alert": "Absence of Anti-CSRF Tokens",
+					"name": "Absence of Anti-CSRF Tokens",
+					"riskcode": "2",
+					"confidence": "1",
+					"riskdesc": "Medium (Low)",
+					"desc": "<p>No Anti-CSRF tokens were found in a HTML submission form.</p><p>A cross-site request forgery is an attack that involves forcing a victim to send an HTTP request to a target destination without their knowledge or intent in order to perform an action as the victim. The underlying cause is application functionality using predictable URL/form actions in a repeatable way. The nature of the attack is that CSRF exploits the trust that a web site has for a user. By contrast, cross-site scripting (XSS) exploits the trust that a user has for a web site. Like XSS, CSRF attacks are not necessarily cross-site, but they can be. Cross-site request forgery is also known as CSRF, XSRF, one-click attack, session riding, confused deputy, and sea surf.</p><p></p><p>CSRF attacks are effective in a number of situations, including:</p><p>    * The victim has an active session on the target site.</p><p>    * The victim is authenticated via HTTP auth on the target site.</p><p>    * The victim is on the same local network as the target site.</p><p></p><p>CSRF has primarily been used to perform an action against a target site using the victim's privileges, but recent techniques have been discovered to disclose information by gaining access to the response. The risk of information disclosure is dramatically increased when the target site is vulnerable to XSS, because XSS can be used as a platform for CSRF, allowing the attack to operate within the bounds of the same-origin policy.</p>",
+					"instances":[ 
+						{
+							"id": "5",
+							"uri": "http://testphp.vulnweb.com",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "89",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "205",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "174",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "227",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "40",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "41",
+							"uri": "http://testphp.vulnweb.com/categories.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "65",
+							"uri": "http://testphp.vulnweb.com/disclaimer.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "87",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"\" method=\"post\" name=\"faddentry\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"name\" \"submit\" ]."
+						},
+						{
+							"id": "107",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "42",
+							"uri": "http://testphp.vulnweb.com/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "345",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "377",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "329",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "91",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "88",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "131",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "108",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "61",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name=\"loginform\" method=\"post\" action=\"userinfo.php\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"pass\" \"uname\" ]."
+						},
+						{
+							"id": "63",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "206",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name='f_addcart' method='POST' action='cart.php'>",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"addcart\" \"price\" ]."
+						},
+						{
+							"id": "219",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "248",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name='f_addcart' method='POST' action='cart.php'>",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"addcart\" \"price\" ]."
+						},
+						{
+							"id": "250",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "229",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name='f_addcart' method='POST' action='cart.php'>",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"addcart\" \"price\" ]."
+						},
+						{
+							"id": "261",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "249",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name='f_addcart' method='POST' action='cart.php'>",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"addcart\" \"price\" ]."
+						},
+						{
+							"id": "271",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "221",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name='f_addcart' method='POST' action='cart.php'>",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"addcart\" \"price\" ]."
+						},
+						{
+							"id": "230",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "148",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name='f_addcart' method='POST' action='cart.php'>",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"addcart\" \"price\" ]."
+						},
+						{
+							"id": "159",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "313",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name='f_addcart' method='POST' action='cart.php'>",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"addcart\" \"price\" ]."
+						},
+						{
+							"id": "337",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "170",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form name=\"form1\" method=\"post\" action=\"/secured/newuser.php\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"signup\" \"ucc\" \"uemail\" \"upass\" \"upass2\" \"uphone\" \"urname\" \"uuname\" ]."
+						},
+						{
+							"id": "176",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "276",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "214",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"\" method=\"post\" name=\"faddentry\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"name\" \"submit\" ]."
+						},
+						{
+							"id": "215",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 2: \"goButton\" \"searchFor\" ]."
+						},
+						{
+							"id": "66",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "<form action=\"search.php?test=query\" method=\"post\">",
+							"otherinfo": "No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ]."
+						}
+					],
+					"count": "40",
+					"systemic": false,
+					"solution": "<p>Phase: Architecture and Design</p><p>Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid.</p><p>For example, use anti-CSRF packages such as the OWASP CSRFGuard.</p><p></p><p>Phase: Implementation</p><p>Ensure that your application is free of cross-site scripting issues, because most CSRF defenses can be bypassed using attacker-controlled script.</p><p></p><p>Phase: Architecture and Design</p><p>Generate a unique nonce for each form, place the nonce into the form, and verify the nonce upon receipt of the form. Be sure that the nonce is not predictable (CWE-330).</p><p>Note that this can be bypassed using XSS.</p><p></p><p>Identify especially dangerous operations. When the user performs a dangerous operation, send a separate confirmation request to ensure that the user intended to perform that operation.</p><p>Note that this can be bypassed using XSS.</p><p></p><p>Use the ESAPI Session Management control.</p><p>This control includes a component for CSRF.</p><p></p><p>Do not use the GET method for any request that triggers a state change.</p><p></p><p>Phase: Implementation</p><p>Check the HTTP Referer header to see if the request originated from an expected page. This could break legitimate functionality, because users or proxies may have disabled sending the Referer for privacy reasons.</p>",
+					"otherinfo": "<p>No known Anti-CSRF token [anticsrf, CSRFToken, __RequestVerificationToken, csrfmiddlewaretoken, authenticity_token, OWASP_CSRFTOKEN, anoncsrf, csrf_token, _csrf, _csrfSecret, __csrf_magic, CSRF, _token, _csrf_token, _csrfToken] was found in the following HTML form: [Form 1: \"goButton\" \"searchFor\" ].</p>",
+					"reference": "<p>https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html</p><p>https://cwe.mitre.org/data/definitions/352.html</p>",
+					"cweid": "352",
+					"wascid": "9",
+					"sourceid": "6"
+				},
+				{
+					"pluginid": "10038",
+					"alertRef": "10038-1",
+					"alert": "Content Security Policy (CSP) Header Not Set",
+					"name": "Content Security Policy (CSP) Header Not Set",
+					"riskcode": "2",
+					"confidence": "3",
+					"riskdesc": "Medium (High)",
+					"desc": "<p>Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks, including Cross Site Scripting (XSS) and data injection attacks. These attacks are used for everything from data theft to site defacement or distribution of malware. CSP provides a set of standard HTTP headers that allow website owners to declare approved sources of content that browsers should be allowed to load on that page \u2014 covered types are JavaScript, CSS, HTML frames, fonts, images and embeddable objects such as Java applets, ActiveX, audio and video files.</p>",
+					"instances":[ 
+						{
+							"id": "4",
+							"uri": "http://testphp.vulnweb.com",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "49",
+							"uri": "http://testphp.vulnweb.com/AJAX/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "83",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "199",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "172",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "202",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "38",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "22",
+							"uri": "http://testphp.vulnweb.com/categories.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "57",
+							"uri": "http://testphp.vulnweb.com/disclaimer.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "71",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "12",
+							"uri": "http://testphp.vulnweb.com/high",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "33",
+							"uri": "http://testphp.vulnweb.com/hpp/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "111",
+							"uri": "http://testphp.vulnweb.com/hpp/?pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "246",
+							"uri": "http://testphp.vulnweb.com/hpp/params.php?p=valid&pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "37",
+							"uri": "http://testphp.vulnweb.com/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "339",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "358",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "317",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "85",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "86",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "128",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "105",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "56",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "19",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "323",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "314",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "353",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "137",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/color-printer/3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "129",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "175",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/web-camera-a4tech/2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "320",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-1.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "318",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-2.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "346",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-3.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "26",
+							"uri": "http://testphp.vulnweb.com/privacy.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "197",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "244",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "223",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "234",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "216",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "143",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "287",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "0",
+							"uri": "http://testphp.vulnweb.com/robots.txt",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "156",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "272",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "189",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "55",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "338",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						}
+					],
+					"count": "47",
+					"systemic": false,
+					"solution": "<p>Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header.</p>",
+					"otherinfo": "",
+					"reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP</p><p>https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html</p><p>https://www.w3.org/TR/CSP/</p><p>https://w3c.github.io/webappsec-csp/</p><p>https://web.dev/articles/csp</p><p>https://caniuse.com/#feat=contentsecuritypolicy</p><p>https://content-security-policy.com/</p>",
+					"cweid": "693",
+					"wascid": "15",
+					"sourceid": "6"
+				},
+				{
+					"pluginid": "10020",
+					"alertRef": "10020-1",
+					"alert": "Missing Anti-clickjacking Header",
+					"name": "Missing Anti-clickjacking Header",
+					"riskcode": "2",
+					"confidence": "2",
+					"riskdesc": "Medium (Medium)",
+					"desc": "<p>The response does not protect against 'ClickJacking' attacks. It should include either Content-Security-Policy with 'frame-ancestors' directive or X-Frame-Options.</p>",
+					"instances":[ 
+						{
+							"id": "21",
+							"uri": "http://testphp.vulnweb.com/AJAX/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "39",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "160",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "127",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "167",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "15",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "11",
+							"uri": "http://testphp.vulnweb.com/categories.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "35",
+							"uri": "http://testphp.vulnweb.com/disclaimer.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "29",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "31",
+							"uri": "http://testphp.vulnweb.com/hpp/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "103",
+							"uri": "http://testphp.vulnweb.com/hpp/?pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "241",
+							"uri": "http://testphp.vulnweb.com/hpp/params.php?p=valid&pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "13",
+							"uri": "http://testphp.vulnweb.com/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "322",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "310",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "295",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "67",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "50",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "98",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "90",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "24",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "14",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "298",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "312",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "321",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "124",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/color-printer/3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "123",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "154",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/web-camera-a4tech/2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "315",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-1.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "302",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-2.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "324",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-3.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "177",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "210",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "192",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "191",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "194",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "113",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "220",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "122",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "262",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "157",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "32",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						},
+						{
+							"id": "297",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-frame-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": ""
+						}
+					],
+					"count": "43",
+					"systemic": false,
+					"solution": "<p>Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app.</p><p>If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's \"frame-ancestors\" directive.</p>",
+					"otherinfo": "",
+					"reference": "<p>https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Frame-Options</p>",
+					"cweid": "1021",
+					"wascid": "15",
+					"sourceid": "36"
+				},
+				{
+					"pluginid": "10037",
+					"alertRef": "10037",
+					"alert": "Server Leaks Information via \"X-Powered-By\" HTTP Response Header Field(s)",
+					"name": "Server Leaks Information via \"X-Powered-By\" HTTP Response Header Field(s)",
+					"riskcode": "1",
+					"confidence": "2",
+					"riskdesc": "Low (Medium)",
+					"desc": "<p>The web/application server is leaking information via one or more \"X-Powered-By\" HTTP response headers. Access to such information may facilitate attackers identifying other frameworks/components your web application is reliant upon and the vulnerabilities such components may be subject to.</p>",
+					"instances":[ 
+						{
+							"id": "10",
+							"uri": "http://testphp.vulnweb.com",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "97",
+							"uri": "http://testphp.vulnweb.com/AJAX/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "141",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "292",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "235",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "288",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "100",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "81",
+							"uri": "http://testphp.vulnweb.com/categories.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "126",
+							"uri": "http://testphp.vulnweb.com/disclaimer.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "162",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "75",
+							"uri": "http://testphp.vulnweb.com/hpp/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "153",
+							"uri": "http://testphp.vulnweb.com/hpp/?pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "299",
+							"uri": "http://testphp.vulnweb.com/hpp/params.php?p=valid&pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "76",
+							"uri": "http://testphp.vulnweb.com/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "409",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "405",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "370",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "152",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "163",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "161",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "203",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "120",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "68",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "389",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "376",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "360",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "226",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/color-printer/3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "180",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "224",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/web-camera-a4tech/2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "373",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-1.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "351",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-2.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "374",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-3.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "58",
+							"uri": "http://testphp.vulnweb.com/privacy.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "286",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "277",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "331",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "326",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "293",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "195",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "388",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "179",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file='%20+%20pict.item(0).firstChild.nodeValue%20+%20'",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "239",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "319",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "252",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/2.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "236",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/2.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "278",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/3.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "258",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/3.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "273",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/4.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "281",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/4.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "307",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/5.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "355",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/5.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "211",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/6.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "254",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/6.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "306",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/7.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "309",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/7.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "209",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "51",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "303",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "266",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "151",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "364",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						},
+						{
+							"id": "150",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "X-Powered-By: PHP/5.6.40-38+ubuntu20.04.1+deb.sury.org+1",
+							"otherinfo": ""
+						}
+					],
+					"count": "62",
+					"systemic": false,
+					"solution": "<p>Ensure that your web server, application server, load balancer, etc. is configured to suppress \"X-Powered-By\" headers.</p>",
+					"otherinfo": "",
+					"reference": "<p>https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/01-Information_Gathering/08-Fingerprint_Web_Application_Framework</p><p>https://www.troyhunt.com/shhh-dont-let-your-response-headers/</p>",
+					"cweid": "497",
+					"wascid": "13",
+					"sourceid": "6"
+				},
+				{
+					"pluginid": "10036",
+					"alertRef": "10036-2",
+					"alert": "Server Leaks Version Information via \"Server\" HTTP Response Header Field",
+					"name": "Server Leaks Version Information via \"Server\" HTTP Response Header Field",
+					"riskcode": "1",
+					"confidence": "3",
+					"riskdesc": "Low (High)",
+					"desc": "<p>The web/application server is leaking version information via the \"Server\" HTTP response header. Access to such information may facilitate attackers identifying other vulnerabilities your web/application server is subject to.</p>",
+					"instances":[ 
+						{
+							"id": "8",
+							"uri": "http://testphp.vulnweb.com",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "69",
+							"uri": "http://testphp.vulnweb.com/AJAX/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "104",
+							"uri": "http://testphp.vulnweb.com/AJAX/styles.css",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "112",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "251",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "198",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "279",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "62",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "70",
+							"uri": "http://testphp.vulnweb.com/categories.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "82",
+							"uri": "http://testphp.vulnweb.com/disclaimer.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "77",
+							"uri": "http://testphp.vulnweb.com/Flash/add.swf",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "125",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "16",
+							"uri": "http://testphp.vulnweb.com/high",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "45",
+							"uri": "http://testphp.vulnweb.com/hpp/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "117",
+							"uri": "http://testphp.vulnweb.com/hpp/?pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "267",
+							"uri": "http://testphp.vulnweb.com/hpp/params.php?p=valid&pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "20",
+							"uri": "http://testphp.vulnweb.com/images/logo.gif",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "101",
+							"uri": "http://testphp.vulnweb.com/images/remark.gif",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "47",
+							"uri": "http://testphp.vulnweb.com/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "381",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "393",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "344",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "118",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "119",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "140",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "146",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "79",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "30",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "347",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "332",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "356",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "165",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/color-printer/3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "135",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "200",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/web-camera-a4tech/2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "158",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/images/1.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "110",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/images/2.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "136",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/images/3.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "348",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-1.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "328",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-2.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "349",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-3.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "36",
+							"uri": "http://testphp.vulnweb.com/privacy.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "225",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "270",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "283",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "305",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "237",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "166",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "361",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "6",
+							"uri": "http://testphp.vulnweb.com/robots.txt",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "420",
+							"uri": "http://testphp.vulnweb.com/secured/style.css",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "169",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file='%20+%20pict.item(0).firstChild.nodeValue%20+%20'",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "213",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "245",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "218",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/2.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "173",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/2.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "231",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/3.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "253",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/3.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "265",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/4.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "259",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/4.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "285",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/5.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "336",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/5.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "188",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/6.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "201",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/6.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "282",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/7.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "290",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/7.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "187",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "7",
+							"uri": "http://testphp.vulnweb.com/sitemap.xml",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "18",
+							"uri": "http://testphp.vulnweb.com/style.css",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "28",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "296",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "240",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "78",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "357",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						},
+						{
+							"id": "134",
+							"uri": "http://testphp.vulnweb.com/userinfo.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "nginx/1.19.0",
+							"otherinfo": ""
+						}
+					],
+					"count": "74",
+					"systemic": false,
+					"solution": "<p>Ensure that your web server, application server, load balancer, etc. is configured to suppress the \"Server\" header or provide generic details.</p>",
+					"otherinfo": "",
+					"reference": "<p>https://httpd.apache.org/docs/current/mod/core.html#servertokens</p><p>https://learn.microsoft.com/en-us/previous-versions/msp-n-p/ff648552(v=pandp.10)</p><p>https://www.troyhunt.com/shhh-dont-let-your-response-headers/</p>",
+					"cweid": "497",
+					"wascid": "13",
+					"sourceid": "6"
+				},
+				{
+					"pluginid": "10021",
+					"alertRef": "10021",
+					"alert": "X-Content-Type-Options Header Missing",
+					"name": "X-Content-Type-Options Header Missing",
+					"riskcode": "1",
+					"confidence": "2",
+					"riskdesc": "Low (Medium)",
+					"desc": "<p>The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'. This allows older versions of Internet Explorer and Chrome to perform MIME-sniffing on the response body, potentially causing the response body to be interpreted and displayed as a content type other than the declared content type. Current (early 2014) and legacy versions of Firefox will use the declared content type (if one is set), rather than performing MIME-sniffing.</p>",
+					"instances":[ 
+						{
+							"id": "9",
+							"uri": "http://testphp.vulnweb.com",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "92",
+							"uri": "http://testphp.vulnweb.com/AJAX/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "106",
+							"uri": "http://testphp.vulnweb.com/AJAX/styles.css",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "139",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "264",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "207",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "284",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "84",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "73",
+							"uri": "http://testphp.vulnweb.com/categories.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "115",
+							"uri": "http://testphp.vulnweb.com/disclaimer.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "80",
+							"uri": "http://testphp.vulnweb.com/Flash/add.swf",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "144",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "60",
+							"uri": "http://testphp.vulnweb.com/hpp/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "130",
+							"uri": "http://testphp.vulnweb.com/hpp/?pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "294",
+							"uri": "http://testphp.vulnweb.com/hpp/params.php?p=valid&pp=12",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "34",
+							"uri": "http://testphp.vulnweb.com/images/logo.gif",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "109",
+							"uri": "http://testphp.vulnweb.com/images/remark.gif",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "59",
+							"uri": "http://testphp.vulnweb.com/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "397",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "403",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "369",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "132",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "142",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "145",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "182",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "94",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "52",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "387",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "333",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "359",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/BuyProduct-3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "181",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/color-printer/3/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "164",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "204",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/web-camera-a4tech/2/",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "168",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/images/1.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "121",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/images/2.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "147",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/images/3.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "371",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-1.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "343",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-2.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "352",
+							"uri": "http://testphp.vulnweb.com/Mod_Rewrite_Shop/RateProduct-3.html",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "257",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "275",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "311",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "316",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "274",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "185",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "378",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "421",
+							"uri": "http://testphp.vulnweb.com/secured/style.css",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "178",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file='%20+%20pict.item(0).firstChild.nodeValue%20+%20'",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "238",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "300",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/1.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "232",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/2.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "212",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/2.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "263",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/3.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "255",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/3.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "268",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/4.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "280",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/4.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "289",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/5.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "340",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/5.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "193",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/6.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "228",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/6.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "291",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/7.jpg",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "308",
+							"uri": "http://testphp.vulnweb.com/showimage.php?file=./pictures/7.jpg&size=160",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "196",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "27",
+							"uri": "http://testphp.vulnweb.com/style.css",
+							"nodeName": null,
+							"method": "GET",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "301",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "247",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "133",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						},
+						{
+							"id": "363",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "x-content-type-options",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.\nAt \"High\" threshold this scan rule will not alert on client or server error responses."
+						}
+					],
+					"count": "68",
+					"systemic": false,
+					"solution": "<p>Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages.</p><p>If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing.</p>",
+					"otherinfo": "<p>This issue still applies to error type pages (401, 403, 500, etc.) as those pages are often still affected by injection issues, in which case there is still concern for browsers sniffing pages away from their actual content type.</p><p>At \"High\" threshold this scan rule will not alert on client or server error responses.</p>",
+					"reference": "<p>https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/compatibility/gg622941(v=vs.85)</p><p>https://owasp.org/www-community/Security_Headers</p>",
+					"cweid": "693",
+					"wascid": "15",
+					"sourceid": "6"
+				},
+				{
+					"pluginid": "10111",
+					"alertRef": "10111",
+					"alert": "Authentication Request Identified",
+					"name": "Authentication Request Identified",
+					"riskcode": "0",
+					"confidence": "1",
+					"riskdesc": "Informational (Low)",
+					"desc": "<p>The given request has been identified as an authentication request. The 'Other Info' field contains a set of key=value lines which identify any relevant fields. If the request is in a context which has an Authentication Method set to \"Auto-Detect\" then this rule will change the authentication to match the request identified.</p>",
+					"instances":[ 
+						{
+							"id": "384",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "uemail",
+							"attack": "",
+							"evidence": "upass",
+							"otherinfo": "userParam=uemail\nuserValue=ZAP\npasswordParam=upass\nreferer=http://testphp.vulnweb.com/signup.php"
+						}
+					],
+					"count": "1",
+					"systemic": false,
+					"solution": "<p>This is an informational alert rather than a vulnerability and so there is nothing to fix.</p>",
+					"otherinfo": "<p>userParam=uemail</p><p>userValue=ZAP</p><p>passwordParam=upass</p><p>referer=http://testphp.vulnweb.com/signup.php</p>",
+					"reference": "<p>https://www.zaproxy.org/docs/desktop/addons/authentication-helper/auth-req-id/</p>",
+					"cweid": "-1",
+					"wascid": "-1",
+					"sourceid": "157"
+				},
+				{
+					"pluginid": "90011",
+					"alertRef": "90011-1",
+					"alert": "Charset Mismatch (Header Versus Meta Content-Type Charset)",
+					"name": "Charset Mismatch (Header Versus Meta Content-Type Charset)",
+					"riskcode": "0",
+					"confidence": "1",
+					"riskdesc": "Informational (Low)",
+					"desc": "<p>This check identifies responses where the HTTP Content-Type header declares a charset different from the charset defined by the body of the HTML or XML. When there's a charset mismatch between the HTTP header and content body Web browsers can be forced into an undesirable content-sniffing mode to determine the content's correct character set.</p><p></p><p>An attacker could manipulate content on the page to be interpreted in an encoding of their choice. For example, if an attacker can control content at the beginning of the page, they could inject script using UTF-7 encoded text and manipulate some browsers into interpreting that text.</p>",
+					"instances":[ 
+						{
+							"id": "3",
+							"uri": "http://testphp.vulnweb.com",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "44",
+							"uri": "http://testphp.vulnweb.com/AJAX/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-1] do not match."
+						},
+						{
+							"id": "64",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "184",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "155",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "183",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "23",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "17",
+							"uri": "http://testphp.vulnweb.com/categories.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "46",
+							"uri": "http://testphp.vulnweb.com/disclaimer.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "54",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "25",
+							"uri": "http://testphp.vulnweb.com/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "327",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "334",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "304",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "74",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "72",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "116",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "102",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "43",
+							"uri": "http://testphp.vulnweb.com/login.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "186",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "243",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "222",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "217",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=4",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "208",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=5",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "138",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=6",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "256",
+							"uri": "http://testphp.vulnweb.com/product.php?pic=7",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "149",
+							"uri": "http://testphp.vulnweb.com/signup.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "269",
+							"uri": "http://testphp.vulnweb.com/cart.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "171",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "48",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match."
+						},
+						{
+							"id": "330",
+							"uri": "http://testphp.vulnweb.com/secured/newuser.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-1] do not match."
+						}
+					],
+					"count": "31",
+					"systemic": false,
+					"solution": "<p>Force UTF-8 for all text content in both the HTTP header and meta tags in HTML or encoding declarations in XML.</p>",
+					"otherinfo": "<p>There was a charset mismatch between the HTTP Header and the META content-type encoding declarations: [UTF-8] and [iso-8859-2] do not match.</p>",
+					"reference": "<p>https://code.google.com/p/browsersec/wiki/Part2#Character_set_handling_and_detection</p>",
+					"cweid": "436",
+					"wascid": "15",
+					"sourceid": "6"
+				},
+				{
+					"pluginid": "10109",
+					"alertRef": "10109",
+					"alert": "Modern Web Application",
+					"name": "Modern Web Application",
+					"riskcode": "0",
+					"confidence": "2",
+					"riskdesc": "Informational (Medium)",
+					"desc": "<p>The application appears to be a modern web application. If you need to explore it automatically then the Ajax Spider may well be more effective than the standard one.</p>",
+					"instances":[ 
+						{
+							"id": "53",
+							"uri": "http://testphp.vulnweb.com/AJAX/index.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href=\"#\" onclick=\"loadSomething('titles.php')\">titles</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "99",
+							"uri": "http://testphp.vulnweb.com/artists.php",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?aid=1','comment','width=500,height=400')\">comment on this artist</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "233",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?aid=1','comment','width=500,height=400')\">comment on this artist</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "190",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?aid=2','comment','width=500,height=400')\">comment on this artist</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "260",
+							"uri": "http://testphp.vulnweb.com/artists.php?artist=3",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?aid=3','comment','width=500,height=400')\">comment on this artist</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "372",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?pid=1','comment','width=500,height=400')\">comment on this picture</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "391",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?artist=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?pid=7','comment','width=500,height=400')\">comment on this picture</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "95",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=1",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?pid=1','comment','width=500,height=400')\">comment on this picture</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						},
+						{
+							"id": "93",
+							"uri": "http://testphp.vulnweb.com/listproducts.php?cat=2",
+							"nodeName": null,
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "<a href='#' onClick=\"window.open('./comment.php?pid=6','comment','width=500,height=400')\">comment on this picture</a>",
+							"otherinfo": "Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application."
+						}
+					],
+					"count": "9",
+					"systemic": false,
+					"solution": "<p>This is an informational alert and so no changes are required.</p>",
+					"otherinfo": "<p>Links have been found that do not have traditional href attributes, which is an indication that this is a modern web application.</p>",
+					"reference": "",
+					"cweid": "-1",
+					"wascid": "-1",
+					"sourceid": "36"
+				},
+				{
+					"pluginid": "10031",
+					"alertRef": "10031",
+					"alert": "User Controllable HTML Element Attribute (Potential XSS)",
+					"name": "User Controllable HTML Element Attribute (Potential XSS)",
+					"riskcode": "0",
+					"confidence": "1",
+					"riskdesc": "Informational (Low)",
+					"desc": "<p>This check looks at user-supplied input in query string parameters and POST data to identify where certain HTML attribute values might be controlled. This provides hot-spot detection for XSS (cross-site scripting) that will require further review by a security analyst to determine exploitability.</p>",
+					"instances":[ 
+						{
+							"id": "242",
+							"uri": "http://testphp.vulnweb.com/guestbook.php",
+							"nodeName": null,
+							"method": "POST",
+							"param": "submit",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "User-controlled HTML attribute values were found. Try injecting special characters to see if XSS might be possible. The page at the following URL:\n\nhttp://testphp.vulnweb.com/guestbook.php\n\nappears to include user input in:\na(n) [input] tag [value] attribute\n\nThe user input found was:\nsubmit=add message\n\nThe user-controlled value was:\nadd message"
+						},
+						{
+							"id": "96",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "goButton",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "User-controlled HTML attribute values were found. Try injecting special characters to see if XSS might be possible. The page at the following URL:\n\nhttp://testphp.vulnweb.com/search.php?test=query\n\nappears to include user input in:\na(n) [input] tag [name] attribute\n\nThe user input found was:\ngoButton=go\n\nThe user-controlled value was:\ngobutton"
+						},
+						{
+							"id": "114",
+							"uri": "http://testphp.vulnweb.com/search.php?test=query",
+							"nodeName": null,
+							"method": "POST",
+							"param": "goButton",
+							"attack": "",
+							"evidence": "",
+							"otherinfo": "User-controlled HTML attribute values were found. Try injecting special characters to see if XSS might be possible. The page at the following URL:\n\nhttp://testphp.vulnweb.com/search.php?test=query\n\nappears to include user input in:\na(n) [input] tag [value] attribute\n\nThe user input found was:\ngoButton=go\n\nThe user-controlled value was:\ngo"
+						}
+					],
+					"count": "3",
+					"systemic": false,
+					"solution": "<p>Validate all input and sanitize output it before writing to any HTML attributes.</p>",
+					"otherinfo": "<p>User-controlled HTML attribute values were found. Try injecting special characters to see if XSS might be possible. The page at the following URL:</p><p></p><p>http://testphp.vulnweb.com/guestbook.php</p><p></p><p>appears to include user input in:</p><p>a(n) [input] tag [value] attribute</p><p></p><p>The user input found was:</p><p>submit=add message</p><p></p><p>The user-controlled value was:</p><p>add message</p>",
+					"reference": "<p>https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html</p>",
+					"cweid": "20",
+					"wascid": "20",
+					"sourceid": "112"
+				}
+			]
+		}
+	],
+	"sequences":[
+	]
+
+}
