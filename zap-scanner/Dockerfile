@@ -2,9 +2,13 @@ FROM ghcr.io/zaproxy/zaproxy:latest
 
 USER root
 
-RUN apt-get update && \
-    apt-get install -y python3 python3-venv && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update || true \
+    && apt-get install -y tzdata \
+    && ln -fs /usr/share/zoneinfo/Asia/Tokyo /etc/localtime \
+    && dpkg-reconfigure -f noninteractive tzdata \
+    && apt-get install -y python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
 
 WORKDIR /app
 
