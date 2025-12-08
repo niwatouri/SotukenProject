@@ -31,8 +31,12 @@ VULN_TYPE_IDS = {
 def scan():
     data = request.get_json()
     target = data.get('url')
-    #scan_types = data.get('scan_types', [])  # ["sqli"], ["xss"], ["all"]
-    scan_types = ["sqli"]
+    scan_types = data.get('scan_types', [])
+    if not isinstance(scan_types, list):
+        scan_types = []
+    scan_types = [str(t).lower() for t in scan_types if isinstance(t, (str, bytes))]
+    if len(scan_types) == 0:
+        scan_types = ["all"]  # 指定が無い場合は全スキャン扱い
 
     if not target:
         return jsonify({"error": "URL is required"}), 400
@@ -76,6 +80,14 @@ def scan():
     # 全無効化
     zap.ascan.disable_all_scanners(apikey=ZAP_API_KEY)
     print("[+] Disabled all scanners.")
+
+    # 未知のscan_typesなどで有効IDがなければデフォルトセットを有効化
+    if not enabled_ids_str:
+        for ids in VULN_TYPE_IDS.values():
+            enabled_ids.extend(ids)
+        enabled_ids = list(set(enabled_ids))
+        enabled_ids_str = ",".join(enabled_ids)
+        print(f"[!] No valid scan_types provided. Falling back to default set: {enabled_ids_str}")
 
     # 必要な plugin IDs だけ有効化
     if enabled_ids_str:

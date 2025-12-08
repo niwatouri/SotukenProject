@@ -23,7 +23,7 @@ export interface ScanResults {
 interface ScanContextType {
   scanResults: ScanResults | null;
   isScanning: boolean;
-  startScan: (url: string, scanType: 'bulk' | 'detailed', options?: string[]) => Promise<void>;
+  startScan: (url: string, scanType: 'bulk' | 'detailed', scanTypes?: string[]) => Promise<void>;
   clearResults: () => void;
 }
 
@@ -36,7 +36,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   const startScan = async (
     url: string,
     scanType: 'bulk' | 'detailed',
-    options?: string[]
+    scanTypes?: string[]
   ): Promise<void> => {
     setIsScanning(true);
 
@@ -49,7 +49,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           url,
           scanType,
-          options,
+          scan_types: scanTypes,
         }),
       });
 

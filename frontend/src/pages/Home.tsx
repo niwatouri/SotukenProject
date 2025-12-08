@@ -81,20 +81,21 @@ function Home() {
   const handleConfirmScan = async () => {
     setShowConfirmModal(false);
 
-    const optionNames = {
-      sqlInjection: 'SQL Injection',
-      directoryTraversal: 'Directory Traversal',
-      xss: 'XSS',
-      portScan: 'Open Port'
+    const optionCodes = {
+      sqlInjection: 'sqli',
+      directoryTraversal: 'path_traversal',
+      xss: 'xss',
+      portScan: 'all', // 未定義の場合は全体スキャンにフォールバック
     };
 
-    const selectedScanOptions = scanType === 'detailed'
+    const selectedScanTypes = scanType === 'detailed'
       ? Object.entries(scanOptions)
           .filter(([_, enabled]) => enabled)
-          .map(([key, _]) => optionNames[key as keyof typeof optionNames])
-      : undefined;
+          .map(([key]) => optionCodes[key as keyof typeof optionCodes])
+          .filter(Boolean)
+      : ['all'];
 
-    await startScan(targetUrl, scanType, selectedScanOptions);
+    await startScan(targetUrl, scanType, selectedScanTypes);
     navigate('/dashboard');
   };
 

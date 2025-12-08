@@ -33,12 +33,20 @@ REPORT_PATH = "/reports/zap_report.json"
 async def scan(request: Request):
     data = await request.json()
     url = data.get("url")
+    scan_types = data.get("scan_types")
 
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
 
+    # scan_types が配列でない/空の場合は全スキャン扱いにフォールバック
+    if not isinstance(scan_types, list) or len(scan_types) == 0:
+        scan_types = ["all"]
+
     async with httpx.AsyncClient(timeout=httpx.Timeout(1200)) as client:
-        resp = await client.post(f"{ZAP_SCANNER_URL}/scan", json={"url": url})
+        resp = await client.post(
+            f"{ZAP_SCANNER_URL}/scan",
+            json={"url": url, "scan_types": scan_types}
+        )
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
         return resp.json()
