@@ -5,6 +5,7 @@ from rq import Queue
 import httpx
 import os
 import json
+from app.report_parser import parse_zap_report
 from app.tasks import zap_scan_task
 from rq.job import Job
 
@@ -36,7 +37,7 @@ async def scan(request: Request):
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(1200)) as client:
         resp = await client.post(f"{ZAP_SCANNER_URL}/scan", json={"url": url})
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
@@ -48,8 +49,8 @@ async def scan(request: Request):
 def get_report():
     try:
         with open(REPORT_PATH, "r") as f:
-            report = json.load(f)
-        return report
+            raw_report = json.load(f)
+        return parse_zap_report(raw_report, default_scan_type="bulk")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Report not found")
 

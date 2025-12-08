@@ -69,17 +69,21 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
       const reportData = await reportRes.json();
       console.log('📄 レポート取得:', reportData);
 
-      // 必要な形式に変換（ZAPレポート形式に応じて調整すること）
-      const parsedResult: ScanResults = {
-        timestamp: new Date().toISOString(),
-        targetUrl: url,
-        scanType,
-        openPorts: [], // ← ポート情報があるならパースして入れて
-        vulnerabilities: [], // ← レポートの内容に合わせてマッピング
-        riskScore: 75, // 仮の値
+      const isValidScanResults = (data: any): data is ScanResults => {
+        return !!data &&
+          typeof data.timestamp === 'string' &&
+          typeof data.targetUrl === 'string' &&
+          typeof data.scanType === 'string' &&
+          Array.isArray(data.openPorts) &&
+          Array.isArray(data.vulnerabilities) &&
+          typeof data.riskScore === 'number';
       };
 
-      setScanResults(parsedResult);
+      if (!isValidScanResults(reportData)) {
+        throw new Error('レポート形式が想定と異なります');
+      }
+
+      setScanResults(reportData);
     } catch (error) {
       console.error('❌ スキャン中エラー:', error);
       alert('スキャンに失敗しました。もう一度お試しください。');
