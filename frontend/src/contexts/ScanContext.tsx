@@ -23,7 +23,7 @@ export interface ScanResults {
 interface ScanContextType {
   scanResults: ScanResults | null;
   isScanning: boolean;
-  startScan: (url: string, scanType: 'bulk' | 'detailed', scanTypes?: string[]) => Promise<void>;
+  startScan: (url: string, scanType: 'bulk' | 'detailed', scanTypes?: string[]) => Promise<boolean>;
   clearResults: () => void;
 }
 
@@ -33,63 +33,97 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
+  const isValidScanResults = (data: any): data is ScanResults => {
+    return !!data &&
+      typeof data.timestamp === 'string' &&
+      typeof data.targetUrl === 'string' &&
+      typeof data.scanType === 'string' &&
+      Array.isArray(data.openPorts) &&
+      Array.isArray(data.vulnerabilities) &&
+      typeof data.riskScore === 'number';
+  };
+
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const startScan = async (
     url: string,
     scanType: 'bulk' | 'detailed',
     scanTypes?: string[]
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     setIsScanning(true);
+    setScanResults(null);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/scan`, {
+      const payloadScanTypes = scanTypes && scanTypes.length > 0 ? scanTypes : ['all'];
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/start-scan/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           url,
-          scanType,
-          scan_types: scanTypes,
+          scan_type: scanType,
+          scan_types: payloadScanTypes,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`スキャン失敗: ${response.statusText}`);
+        throw new Error(`ジョブ投入に失敗しました: ${response.statusText}`);
       }
 
-      const result = await response.json();
-      console.log('✅ スキャン開始成功:', result);
-
-      // レポート取得（オプション：必要であれば）
-      const reportRes = await fetch(`${import.meta.env.VITE_API_URL}/report`);
-      if (!reportRes.ok) {
-        throw new Error(`レポート取得失敗: ${reportRes.statusText}`);
+      const { job_id: jobId } = await response.json();
+      if (!jobId) {
+        throw new Error('ジョブIDの取得に失敗しました');
       }
 
-      const reportData = await reportRes.json();
-      console.log('📄 レポート取得:', reportData);
+      console.log('✅ スキャンジョブ投入:', jobId);
 
-      const isValidScanResults = (data: any): data is ScanResults => {
-        return !!data &&
-          typeof data.timestamp === 'string' &&
-          typeof data.targetUrl === 'string' &&
-          typeof data.scanType === 'string' &&
-          Array.isArray(data.openPorts) &&
-          Array.isArray(data.vulnerabilities) &&
-          typeof data.riskScore === 'number';
-      };
+      const maxWaitMs = 20 * 60 * 1000; // 20分まで待機
+      const pollIntervalMs = 5000;
+      const startTime = Date.now();
 
-      if (!isValidScanResults(reportData)) {
-        throw new Error('レポート形式が想定と異なります');
+      while (true) {
+        if (Date.now() - startTime > maxWaitMs) {
+          throw new Error('スキャンがタイムアウトしました');
+        }
+
+        const resultRes = await fetch(`${import.meta.env.VITE_API_URL}/scan-result/${jobId}`);
+        if (!resultRes.ok) {
+          throw new Error(`結果取得失敗: ${resultRes.statusText}`);
+        }
+
+        const resultData = await resultRes.json();
+        const { status, result, error } = resultData;
+
+        if (status === 'finished') {
+          if (error) {
+            throw new Error(typeof error === 'string' ? error : 'スキャン結果の取得中にエラーが発生しました');
+          }
+          if (!isValidScanResults(result)) {
+            throw new Error('スキャン結果の形式が想定と異なります');
+          }
+          setScanResults(result);
+          return true;
+        }
+
+        if (status === 'failed') {
+          throw new Error(error || 'スキャンが失敗しました');
+        }
+
+        // queued / started などは再ポーリング
+        await sleep(pollIntervalMs);
       }
-
-      setScanResults(reportData);
     } catch (error) {
       console.error('❌ スキャン中エラー:', error);
-      alert('スキャンに失敗しました。もう一度お試しください。');
+      const message = error instanceof Error ? error.message : 'スキャンに失敗しました。もう一度お試しください。';
+      alert(message);
+      return false;
     } finally {
       setIsScanning(false);
     }
+
+    return false;
   };
 
   const clearResults = () => {

@@ -95,8 +95,10 @@ function Home() {
           .filter(Boolean)
       : ['all'];
 
-    await startScan(targetUrl, scanType, selectedScanTypes);
-    navigate('/dashboard');
+    const success = await startScan(targetUrl, scanType, selectedScanTypes);
+    if (success) {
+      navigate('/dashboard');
+    }
   };
 
   const getSelectedOptions = () => {
@@ -126,7 +128,7 @@ function Home() {
             autoplay
             style={{ width: '300px', height: '300px' }}
           ></dotlottie-player>
-          <p className="load mt-4 text-lg font-medium text-gray-700">スキャン実行中・・・</p>
+          <p className="load mt-4 text-lg font-medium text-gray-700">キュー投入/スキャン中・・・</p>
         </div>
       )}
 
@@ -245,7 +247,7 @@ function Home() {
               className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3"
             >
               <Scan className="w-5 h-5" />
-              <span>{isScanning ? 'スキャン実行中...' : 'スキャン開始'}</span>
+              <span>{isScanning ? 'キュー投入/スキャン中...' : 'スキャン開始'}</span>
             </button>
           </div>
         </div>
