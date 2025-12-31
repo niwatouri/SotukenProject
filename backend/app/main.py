@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 from rq import Queue
@@ -6,6 +6,7 @@ import httpx
 import os
 import json
 from typing import Any, Dict, Optional
+import jwt
 from app.report_parser import parse_zap_report
 from app.tasks import zap_scan_task
 from rq.job import Job
@@ -28,11 +29,43 @@ app.add_middleware(
 
 ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
 REPORT_PATH = "/reports/zap_report.json"
+JWT_SECRET = os.getenv("JWT_SECRET") or "dev-secret"
+JWT_ALGORITHM = "HS256"
+
+
+def _extract_token(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        scheme, _, token = auth_header.partition(" ")
+        if scheme.lower() == "bearer" and token:
+            return token
+
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token
+
+    return None
+
+
+def _verify_token(token: str) -> Dict[str, Any]:
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=401, detail="Token expired") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token") from exc
+
+
+async def require_auth(request: Request) -> Dict[str, Any]:
+    token = _extract_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return _verify_token(token)
 
 
 # --- ✅ /scan エンドポイント ---
 @app.post("/scan")
-async def scan(request: Request):
+async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
     """
     Deprecated: use /start-scan/ and /scan-result/{job_id} for async scans instead.
     """
@@ -59,7 +92,7 @@ async def scan(request: Request):
 
 # --- レポート取得 ---
 @app.get("/report")
-def get_report():
+def get_report(user: Dict[str, Any] = Depends(require_auth)):
     try:
         with open(REPORT_PATH, "r") as f:
             raw_report = json.load(f)
@@ -70,7 +103,7 @@ def get_report():
 
 # --- AIアドバイス仮実装 ---
 @app.post("/advice")
-async def get_advice(request: Request):
+async def get_advice(request: Request, user: Dict[str, Any] = Depends(require_auth)):
     data = await request.json()
     return {
         "advice": "これはAIによる仮のアドバイスです",
@@ -80,7 +113,7 @@ async def get_advice(request: Request):
 
 # --- RQタスク登録 ---
 @app.post("/start-scan/")
-async def start_scan(request: Request):
+async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
     data = await request.json()
     url = data.get("url")
     scan_types = data.get("scan_types")
@@ -124,7 +157,7 @@ def _parse_job_result(job_result: Any) -> Optional[Dict[str, Any]]:
 
 # --- RQ結果取得 ---
 @app.get("/scan-result/{job_id}")
-def get_scan_result(job_id: str):
+def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
     try:
         job = Job.fetch(job_id, connection=redis_conn)
     except Exception:

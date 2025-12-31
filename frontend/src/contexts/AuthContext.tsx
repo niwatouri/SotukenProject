@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -9,14 +9,88 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const resolveBaseUrl = (envValue: string | undefined, fallbackPort: number) => {
+  const defaultUrl = envValue || `http://localhost:${fallbackPort}`;
+
+  if (typeof window === 'undefined') {
+    return defaultUrl.replace(/\/$/, '');
+  }
+
+  try {
+    const parsed = new URL(defaultUrl);
+    const currentHost = window.location.hostname;
+    const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+
+    if (isLocalHost && currentHost && currentHost !== parsed.hostname) {
+      parsed.hostname = currentHost;
+    }
+
+    return parsed.origin;
+  } catch {
+    return defaultUrl.replace(/\/$/, '');
+  }
+};
+
+const AUTH_BASE_URL = resolveBaseUrl(import.meta.env.VITE_AUTH_URL, 3000);
+// ローカルストレージを使ってリロード後も状態を維持し、Cookie設定の差異を避ける。
+const TOKEN_STORAGE_KEY = 'auth_token';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null);
 
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      return;
+    }
+
+    let isActive = true;
+
+    const restoreSession = async () => {
+      try {
+        const response = await fetch(`${AUTH_BASE_URL}/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Unauthorized');
+        }
+
+        const data = await response.json();
+        const email = data?.user?.email;
+        if (!email) {
+          throw new Error('Invalid user payload');
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        setIsAuthenticated(true);
+        setUser({ email });
+      } catch (err) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        if (!isActive) {
+          return;
+        }
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:3000/login', {
+      const response = await fetch(`${AUTH_BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -28,10 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json();
-      console.log('ログイン成功:', data);
+      if (!data?.token) {
+        return false;
+      }
 
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
       setIsAuthenticated(true);
-      setUser({ email }); // 実際は data.user を使うとより良い
+      setUser({ email: data.user?.email ?? email });
       return true;
     } catch (err) {
       console.error('ログインエラー:', err);
@@ -55,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/register', {
+      const response = await fetch(`${AUTH_BASE_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -66,9 +143,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: data.error || '登録に失敗しました' };
       }
 
-      // 登録成功時
+      const data = await response.json();
+      if (!data?.token) {
+        return { success: false, error: '登録に失敗しました' };
+      }
+
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
       setIsAuthenticated(true);
-      setUser({ email });
+      setUser({ email: data.user?.email ?? email });
       return { success: true };
     } catch (error) {
       return { success: false, error: 'サーバーに接続できませんでした' };
@@ -76,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
     setIsAuthenticated(false);
     setUser(null);
   };

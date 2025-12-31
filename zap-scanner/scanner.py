@@ -26,6 +26,28 @@ VULN_TYPE_IDS = {
     "path_traversal": ['6'],
 }
 
+def _get_available_scanner_ids():
+    """
+    現在のZAPで有効なスキャナID一覧を取得する。
+    """
+    try:
+        scanners_attr = zap.ascan.scanners
+        scanners = scanners_attr() if callable(scanners_attr) else scanners_attr
+    except Exception as exc:
+        print(f"[!] Failed to load scanners list: {exc}")
+        return None
+
+    if isinstance(scanners, dict):
+        scanners = scanners.get("scanners", [])
+    if not isinstance(scanners, list):
+        return None
+
+    available = set()
+    for scanner in scanners:
+        if isinstance(scanner, dict) and scanner.get("id") is not None:
+            available.add(str(scanner["id"]))
+    return available
+
 
 @app.route('/scan', methods=['POST'])
 def scan():
@@ -91,8 +113,23 @@ def scan():
 
     # 必要な plugin IDs だけ有効化
     if enabled_ids_str:
-        zap.ascan.enable_scanners(ids=enabled_ids_str, apikey=ZAP_API_KEY)
-        print(f"[+] Enabled scanners: {enabled_ids_str}")
+        available_ids = _get_available_scanner_ids()
+        if available_ids:
+            enabled_ids = [sid for sid in enabled_ids if sid in available_ids]
+            enabled_ids_str = ",".join(enabled_ids)
+            if enabled_ids_str:
+                zap.ascan.enable_scanners(ids=enabled_ids_str, apikey=ZAP_API_KEY)
+                print(f"[+] Enabled scanners: {enabled_ids_str}")
+            else:
+                print("[!] No valid scanner IDs matched. Falling back to enable all scanners.")
+                zap.ascan.enable_all_scanners(apikey=ZAP_API_KEY)
+        else:
+            try:
+                zap.ascan.enable_scanners(ids=enabled_ids_str, apikey=ZAP_API_KEY)
+                print(f"[+] Enabled scanners: {enabled_ids_str}")
+            except Exception as exc:
+                print(f"[!] Failed to enable scanners by ID: {exc}. Falling back to enable all scanners.")
+                zap.ascan.enable_all_scanners(apikey=ZAP_API_KEY)
     else:
         return jsonify({"error": "No valid scan_types provided"}), 400
 

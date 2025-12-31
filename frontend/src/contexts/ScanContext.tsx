@@ -28,6 +28,30 @@ interface ScanContextType {
 }
 
 const ScanContext = createContext<ScanContextType | undefined>(undefined);
+const TOKEN_STORAGE_KEY = 'auth_token';
+const resolveBaseUrl = (envValue: string | undefined, fallbackPort: number) => {
+  const defaultUrl = envValue || `http://localhost:${fallbackPort}`;
+
+  if (typeof window === 'undefined') {
+    return defaultUrl.replace(/\/$/, '');
+  }
+
+  try {
+    const parsed = new URL(defaultUrl);
+    const currentHost = window.location.hostname;
+    const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+
+    if (isLocalHost && currentHost && currentHost !== parsed.hostname) {
+      parsed.hostname = currentHost;
+    }
+
+    return parsed.origin;
+  } catch {
+    return defaultUrl.replace(/\/$/, '');
+  }
+};
+
+const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, 8000);
 
 export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
@@ -44,6 +68,10 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   };
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
 
   const startScan = async (
     url: string,
@@ -56,10 +84,11 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     try {
       const payloadScanTypes = scanTypes && scanTypes.length > 0 ? scanTypes : ['all'];
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/start-scan/`, {
+      const response = await fetch(`${API_BASE_URL}/start-scan/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           url,
@@ -88,7 +117,11 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
           throw new Error('スキャンがタイムアウトしました');
         }
 
-        const resultRes = await fetch(`${import.meta.env.VITE_API_URL}/scan-result/${jobId}`);
+        const resultRes = await fetch(`${API_BASE_URL}/scan-result/${jobId}`, {
+          headers: {
+            ...getAuthHeaders(),
+          },
+        });
         if (!resultRes.ok) {
           throw new Error(`結果取得失敗: ${resultRes.statusText}`);
         }

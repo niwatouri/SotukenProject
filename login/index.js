@@ -2,10 +2,29 @@ import express from 'express';
 import pool from './db.js';
 import bcrypt from 'bcrypt';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+
+const issueToken = (user) =>
+  jwt.sign(
+    { userId: user.id, email: user.email },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+
+const getTokenFromRequest = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+  return null;
+};
 
 // ── 新規登録 API ─────────────────────────────
 app.post('/register', async (req, res) => {
@@ -16,11 +35,17 @@ app.post('/register', async (req, res) => {
 
   try {
     const hash = await bcrypt.hash(password, 10);
-    await pool.query(
-      'INSERT INTO users (email, password) VALUES ($1, $2)',
+    const result = await pool.query(
+      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email',
       [email, hash]
     );
-    return res.status(201).json({ message: '登録成功' });
+    const user = result.rows[0];
+    const token = issueToken(user);
+    return res.status(201).json({
+      message: '登録成功',
+      token,
+      user: { userId: user.id, email: user.email },
+    });
   } catch (err) {
     // UNIQUE 制約違反だったら適切に処理
     if (err.code === '23505') {
@@ -40,7 +65,7 @@ app.post('/login', async (req, res) => {
 
   try {
     // ① ユーザー取得
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await pool.query('SELECT id, email, password FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
       return res.status(400).json({ error: 'ユーザーが存在しません' });
     }
@@ -53,11 +78,32 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'パスワードが間違っています' });
     }
 
-    // 成功
-    return res.status(200).json({ message: 'ログイン成功' });
+    const token = issueToken(user);
+    return res.status(200).json({
+      message: 'ログイン成功',
+      token,
+      user: { userId: user.id, email: user.email },
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'ログイン失敗' });
+  }
+});
+
+// ── ログイン状態確認 API ─────────────────────
+app.get('/me', (req, res) => {
+  const token = getTokenFromRequest(req);
+  if (!token) {
+    return res.status(401).json({ error: '認証が必要です' });
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return res.status(200).json({
+      user: { userId: payload.userId, email: payload.email },
+    });
+  } catch (err) {
+    return res.status(401).json({ error: 'トークンが無効です' });
   }
 });
 

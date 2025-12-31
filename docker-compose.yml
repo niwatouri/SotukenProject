@@ -33,11 +33,13 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: mydb
       DB_PORT: 5432
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
     ports:
       - "3000:3000"
     volumes:
       - ./login:/app
-      - /app/node_modules
+      - login-node-modules:/app/node_modules
     networks:
       - zapnet
 
@@ -69,6 +71,7 @@ services:
       - zap-scanner
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
+      - JWT_SECRET=${JWT_SECRET}
     networks:
       - zapnet
 
@@ -116,6 +119,7 @@ services:
 
 volumes:
   postgres-data:
+  login-node-modules:
 
 
 networks:

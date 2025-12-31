@@ -2,6 +2,7 @@
 set -e
 
 echo "Starting ZAP daemon..."
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} -Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3 -Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3"
 zap.sh -daemon \
     -host 0.0.0.0 \
     -port 8090 \
