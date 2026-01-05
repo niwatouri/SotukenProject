@@ -1,5 +1,6 @@
 import os
 import re
+import threading
 import time
 from urllib.parse import quote, urlparse
 from zapv2 import ZAPv2
@@ -23,6 +24,8 @@ zap = ZAPv2(
     apikey=ZAP_API_KEY,
     proxies={'http': ZAP_PROXY, 'https': ZAP_PROXY}
 )
+
+SCAN_LOCK = threading.Lock()
 
 # 脆弱性タイプ → plugin ID
 VULN_TYPE_IDS = {
@@ -449,6 +452,10 @@ def scan():
     if not target:
         return jsonify({"error": "URL is required"}), 400
 
+    lock_acquired = SCAN_LOCK.acquire(blocking=False)
+    if not lock_acquired:
+        return jsonify({"error": "scanner busy"}), 429
+
     print(f"[*] Start scan target={target}, scan_types={scan_types}")
 
     # --- plugin IDの決定 ---
@@ -475,58 +482,58 @@ def scan():
     context_name = None
     user_context = None
 
-    if isinstance(auth_config, dict):
-        method = auth_config.get("method")
-        try:
-            if method == "form":
-                context_name, user_context, auth_status = _apply_form_auth(auth_config, target)
-            elif method == "cookie":
-                rule_id, auth_status = _apply_cookie_auth(auth_config.get("cookie"))
-                if rule_id is not None:
-                    replacer_rules.append(rule_id)
-            elif method == "header":
-                rule_id, auth_status = _apply_header_auth(auth_config.get("header"))
-                if rule_id is not None:
-                    replacer_rules.append(rule_id)
-            else:
+    try:
+        if isinstance(auth_config, dict):
+            method = auth_config.get("method")
+            try:
+                if method == "form":
+                    context_name, user_context, auth_status = _apply_form_auth(auth_config, target)
+                elif method == "cookie":
+                    rule_id, auth_status = _apply_cookie_auth(auth_config.get("cookie"))
+                    if rule_id is not None:
+                        replacer_rules.append(rule_id)
+                elif method == "header":
+                    rule_id, auth_status = _apply_header_auth(auth_config.get("header"))
+                    if rule_id is not None:
+                        replacer_rules.append(rule_id)
+                else:
+                    auth_status = _build_auth_status(
+                        used=True,
+                        method=method,
+                        success=False,
+                        message="未対応の認証方式です",
+                    )
+            except Exception:
                 auth_status = _build_auth_status(
                     used=True,
                     method=method,
                     success=False,
-                    message="未対応の認証方式です",
+                    message="認証設定に失敗しました",
                 )
-        except Exception as exc:
-            auth_status = _build_auth_status(
-                used=True,
-                method=method,
-                success=False,
-                message="認証設定に失敗しました",
-            )
 
-    if user_context and isinstance(auth_config, dict) and auth_config.get("method") == "form":
-        context_id, user_id = user_context
-        success, message = _verify_form_auth(context_id, user_id, auth_config.get("login_indicator"))
-        if success is not None:
-            auth_status["success"] = success
-        if message:
-            auth_status["message"] = message
-        if auth_status.get("success") is False:
-            try:
-                zap.forcedUser.set_forced_user_mode_enabled("false", apikey=ZAP_API_KEY)
-            except Exception:
-                pass
-            user_context = None
+        if user_context and isinstance(auth_config, dict) and auth_config.get("method") == "form":
+            context_id, user_id = user_context
+            success, message = _verify_form_auth(context_id, user_id, auth_config.get("login_indicator"))
+            if success is not None:
+                auth_status["success"] = success
+            if message:
+                auth_status["message"] = message
+            if auth_status.get("success") is False:
+                try:
+                    zap.forcedUser.set_forced_user_mode_enabled("false", apikey=ZAP_API_KEY)
+                except Exception:
+                    pass
+                user_context = None
 
-    _apply_spider_options()
-    _apply_ascan_options()
+        _apply_spider_options()
+        _apply_ascan_options()
 
-    # --- パッシブスキャン停止 ---
-    zap.pscan.set_enabled(enabled='false', apikey=ZAP_API_KEY)
+        # --- パッシブスキャン停止 ---
+        zap.pscan.set_enabled(enabled='false', apikey=ZAP_API_KEY)
 
 
-    # --- Spider ---
-    print("[*] Starting spider...")
-    try:
+        # --- Spider ---
+        print("[*] Starting spider...")
         if user_context:
             context_id, user_id = user_context
             try:
@@ -684,6 +691,8 @@ def scan():
                 zap.context.remove_context(context_name, apikey=ZAP_API_KEY)
             except Exception:
                 pass
+        if lock_acquired:
+            SCAN_LOCK.release()
 
     # レポート取得
     report = zap.core.jsonreport(apikey=ZAP_API_KEY)

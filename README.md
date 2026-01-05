@@ -9,6 +9,12 @@ vulnerability scanner
 5) 既存のDBボリュームを使っている場合は、以下で新しいテーブルを反映  
    `docker compose exec db psql -U postgres -d mydb -f /docker-entrypoint-initdb.d/init.sql`
 
+## Scaling (zap-scanner)
+- 同時実行は `zap-scanner` のスケール数に依存します（1インスタンス=1スキャン）
+- 例: 最大5件まで同時処理したい場合
+  `docker compose up --build --scale zap-scanner=5 --scale worker=5`
+- 1インスタンスに複数リクエストが来た場合は `429 (scanner busy)` を返します
+
 ## Auth / API
 - `POST /register` / `POST /login` は `{ token, user: { userId, email } }` を返します
 - `GET /me` は `Authorization: Bearer <token>` でログイン状態を確認します

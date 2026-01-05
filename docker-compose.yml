@@ -84,7 +84,6 @@ services:
   # ワーカー（RQ）
   worker:
     build: ./backend
-    container_name: rq-worker
     command: [ "python", "app/worker.py" ]
     depends_on:
       - backend
@@ -118,7 +117,6 @@ services:
     build:
       context: ./zap-scanner
       dockerfile: Dockerfile
-    container_name: zap-scanner
     environment:
       - ZAP_API_KEY=${ZAP_API_KEY}
       - SPIDER_MAX_DURATION_MINUTES=${SPIDER_MAX_DURATION_MINUTES}
@@ -132,9 +130,6 @@ services:
       - ASCAN_DELAY_IN_MS=${ASCAN_DELAY_IN_MS}
     volumes:
       - ./reports:/reports
-    ports:
-      - "8090:8090"
-      - "5000:5000"
     networks:
       - zapnet
 
