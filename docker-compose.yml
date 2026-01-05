@@ -72,6 +72,7 @@ services:
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
       - JWT_SECRET=${JWT_SECRET}
+      - ZAP_SCANNER_API_KEY=${ZAP_SCANNER_API_KEY}
       - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS}
       - DB_HOST=${DB_HOST}
       - DB_USER=${DB_USER}
@@ -90,6 +91,7 @@ services:
       - redis
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
+      - ZAP_SCANNER_API_KEY=${ZAP_SCANNER_API_KEY}
       - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -119,6 +121,8 @@ services:
       dockerfile: Dockerfile
     environment:
       - ZAP_API_KEY=${ZAP_API_KEY}
+      - ZAP_SCANNER_API_KEY=${ZAP_SCANNER_API_KEY}
+      - BACKEND_URL=http://backend:8000
       - SPIDER_MAX_DURATION_MINUTES=${SPIDER_MAX_DURATION_MINUTES}
       - SPIDER_MAX_DEPTH=${SPIDER_MAX_DEPTH}
       - SPIDER_MAX_CHILDREN=${SPIDER_MAX_CHILDREN}

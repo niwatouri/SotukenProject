@@ -182,14 +182,14 @@ function Home() {
             style={{ width: '300px', height: '300px' }}
           ></dotlottie-player>
           <p className="load mt-4 text-lg font-medium text-gray-700">スキャン中・・・</p>
-          <div className="mt-4 w-64">
-            <div className="h-2 w-full rounded-full bg-gray-200">
+          <div className="mt-8 w-80">
+            <div className="h-3 w-full rounded-full bg-gray-200">
               <div
-                className="h-2 rounded-full bg-blue-600 transition-all"
+                className="h-3 rounded-full bg-blue-600 transition-all"
                 style={{ width: `${scanProgress}%` }}
               ></div>
             </div>
-            <p className="mt-2 text-center text-sm text-gray-600">{scanProgress}%</p>
+            <p className="mt-3 text-center text-base text-gray-600">{scanProgress}%</p>
           </div>
         </div>
       )}

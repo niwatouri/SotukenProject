@@ -168,15 +168,18 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         }
 
         const resultData = await resultRes.json();
-        const { status, result, error } = resultData;
-        if (status === 'queued') {
-          bumpProgress(2);
-        } else if (status === 'started') {
-          bumpProgress(5);
-        } else {
-          const elapsed = Date.now() - startTime;
-          const estimated = Math.floor((elapsed / maxWaitMs) * 100);
-          bumpProgress(Math.min(95, estimated));
+        const { status, result, error, progress } = resultData;
+        if (typeof progress === 'number' && Number.isFinite(progress)) {
+          bumpProgress(progress);
+        }
+        if (typeof progress !== 'number' || !Number.isFinite(progress)) {
+          if (status === 'queued') {
+            bumpProgress(2);
+          } else {
+            const elapsed = Date.now() - startTime;
+            const estimated = Math.floor((elapsed / maxWaitMs) * 100);
+            bumpProgress(Math.min(95, Math.max(5, estimated)));
+          }
         }
 
         if (status === 'finished') {

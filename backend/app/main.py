@@ -1,4 +1,5 @@
-from fastapi import Depends, FastAPI, HTTPException, Request
+import asyncio
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 from rq import Queue
@@ -14,6 +15,7 @@ from app.tasks import zap_scan_task
 from rq.job import Job
 
 SCAN_TIMEOUT_SECONDS = int(os.getenv("SCAN_TIMEOUT_SECONDS", "3600"))
+RETRY_BACKOFF_SECONDS = [2, 4, 8, 12, 20, 30]
 
 app = FastAPI()
 
@@ -37,6 +39,7 @@ app.add_middleware(
 )
 
 ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
+ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
 JWT_SECRET = os.getenv("JWT_SECRET") or "dev-secret"
 JWT_ALGORITHM = "HS256"
 
@@ -71,6 +74,15 @@ async def require_auth(request: Request) -> Dict[str, Any]:
     return _verify_token(token)
 
 
+def _verify_scanner_key(x_api_key: Optional[str]) -> None:
+    if not ZAP_SCANNER_API_KEY:
+        return
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="Missing scanner API key")
+    if x_api_key != ZAP_SCANNER_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid scanner API key")
+
+
 def _normalize_report(report_payload: Any) -> Optional[Dict[str, Any]]:
     if isinstance(report_payload, dict):
         return report_payload
@@ -93,11 +105,11 @@ def _create_scan_record(user_id: int, url: str, scan_types: list[str], status: s
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO scans (user_id, target_url, scan_types, status, started_at)
-                VALUES (%s, %s, %s, %s, CASE WHEN %s = 'running' THEN NOW() ELSE NULL END)
+                INSERT INTO scans (user_id, target_url, scan_types, status, started_at, progress_percent)
+                VALUES (%s, %s, %s, %s, CASE WHEN %s = 'running' THEN NOW() ELSE NULL END, %s)
                 RETURNING id
                 """,
-                (user_id, url, Json(scan_types), status, status),
+                (user_id, url, Json(scan_types), status, status, 0),
             )
             row = cur.fetchone()
             return int(row["id"])
@@ -119,7 +131,8 @@ def _update_scan_job_id(scan_id: int, user_id: int, job_id: str) -> None:
 def _update_scan_result(scan_id: int, user_id: int, status: str,
                         raw_report: Optional[Dict[str, Any]],
                         parsed_report: Optional[Dict[str, Any]],
-                        error: Optional[str]) -> None:
+                        error: Optional[str],
+                        progress_percent: Optional[int] = None) -> None:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -129,7 +142,8 @@ def _update_scan_result(scan_id: int, user_id: int, status: str,
                     completed_at = NOW(),
                     error = %s,
                     raw_report = %s,
-                    parsed_report = %s
+                    parsed_report = %s,
+                    progress_percent = COALESCE(%s, progress_percent)
                 WHERE id = %s AND user_id = %s
                 """,
                 (
@@ -137,6 +151,7 @@ def _update_scan_result(scan_id: int, user_id: int, status: str,
                     error,
                     Json(raw_report) if raw_report is not None else None,
                     Json(parsed_report) if parsed_report is not None else None,
+                    progress_percent,
                     scan_id,
                     user_id,
                 ),
@@ -149,7 +164,7 @@ def _fetch_scan_by_job_id(user_id: int, job_id: str) -> Optional[Dict[str, Any]]
             cur.execute(
                 """
                 SELECT id, user_id, target_url, scan_types, status, job_id, created_at,
-                       started_at, completed_at, error, parsed_report
+                       started_at, completed_at, error, parsed_report, progress_percent
                 FROM scans
                 WHERE user_id = %s AND job_id = %s
                 """,
@@ -164,7 +179,7 @@ def _fetch_scan_by_id(user_id: int, scan_id: int) -> Optional[Dict[str, Any]]:
             cur.execute(
                 """
                 SELECT id, user_id, target_url, scan_types, status, job_id, created_at,
-                       started_at, completed_at, error, parsed_report
+                       started_at, completed_at, error, parsed_report, progress_percent
                 FROM scans
                 WHERE user_id = %s AND id = %s
                 """,
@@ -209,6 +224,41 @@ def _fetch_latest_report(user_id: int) -> Optional[Dict[str, Any]]:
             return row["parsed_report"] if row else None
 
 
+def _update_scan_progress(scan_id: int, progress_percent: int) -> None:
+    progress_percent = max(0, min(99, int(progress_percent)))
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE scans
+                SET progress_percent = GREATEST(progress_percent, %s),
+                    started_at = COALESCE(started_at, NOW())
+                WHERE id = %s AND status NOT IN ('finished', 'failed')
+                """,
+                (progress_percent, scan_id),
+            )
+
+
+async def _post_scan_with_retry(client: httpx.AsyncClient, payload: Dict[str, Any], headers: Dict[str, str]) -> httpx.Response:
+    response = await client.post(
+        f"{ZAP_SCANNER_URL}/scan",
+        json=payload,
+        headers=headers,
+    )
+    if response.status_code != 429:
+        return response
+    for wait_seconds in RETRY_BACKOFF_SECONDS:
+        await asyncio.sleep(wait_seconds)
+        response = await client.post(
+            f"{ZAP_SCANNER_URL}/scan",
+            json=payload,
+            headers=headers,
+        )
+        if response.status_code != 429:
+            break
+    return response
+
+
 # --- ✅ /scan エンドポイント ---
 @app.post("/scan")
 async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
@@ -232,20 +282,27 @@ async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
 
     scan_id = _create_scan_record(user_id, url, scan_types, "running")
 
+    headers = {"X-API-Key": ZAP_SCANNER_API_KEY} if ZAP_SCANNER_API_KEY else {}
     async with httpx.AsyncClient(timeout=httpx.Timeout(SCAN_TIMEOUT_SECONDS)) as client:
-        resp = await client.post(
-            f"{ZAP_SCANNER_URL}/scan",
-            json={"url": url, "scan_types": scan_types, "auth": auth}
+        resp = await _post_scan_with_retry(
+            client,
+            {"url": url, "scan_types": scan_types, "auth": auth, "scan_id": scan_id},
+            headers,
         )
         if resp.status_code != 200:
-            _update_scan_result(scan_id, user_id, "failed", None, None, resp.text)
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+            error_message = (
+                "ZAP scanner busy after retries"
+                if resp.status_code == 429
+                else f"ZAP scan failed with status {resp.status_code}"
+            )
+            _update_scan_result(scan_id, user_id, "failed", None, None, error_message, progress_percent=100)
+            raise HTTPException(status_code=resp.status_code, detail=error_message)
 
         data = resp.json()
         raw_report = _normalize_report(data.get("report"))
         auth_status = data.get("auth_status") if isinstance(data, dict) else None
         if raw_report is None:
-            _update_scan_result(scan_id, user_id, "failed", None, None, "Report payload missing or invalid")
+            _update_scan_result(scan_id, user_id, "failed", None, None, "Report payload missing or invalid", progress_percent=100)
             raise HTTPException(status_code=500, detail="Report payload missing or invalid")
 
         parsed_report = parse_zap_report(
@@ -255,7 +312,7 @@ async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
         )
         if isinstance(auth_status, dict):
             parsed_report["authStatus"] = auth_status
-        _update_scan_result(scan_id, user_id, "finished", raw_report, parsed_report, None)
+        _update_scan_result(scan_id, user_id, "finished", raw_report, parsed_report, None, progress_percent=100)
         return data
 
 
@@ -304,6 +361,26 @@ async def get_advice(request: Request, user: Dict[str, Any] = Depends(require_au
         "advice": "これはAIによる仮のアドバイスです",
         "based_on": data
     }
+
+
+@app.post("/scan-progress")
+async def update_scan_progress(
+    request: Request,
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+):
+    _verify_scanner_key(x_api_key)
+    data = await request.json()
+    scan_id = data.get("scan_id")
+    progress = data.get("progress_percent")
+    if scan_id is None or progress is None:
+        raise HTTPException(status_code=400, detail="scan_id and progress_percent are required")
+    try:
+        scan_id = int(scan_id)
+        progress = int(progress)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="scan_id/progress_percent must be numeric") from exc
+    _update_scan_progress(scan_id, progress)
+    return {"status": "ok"}
 
 
 # --- RQタスク登録 ---
@@ -403,10 +480,18 @@ def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
         raise HTTPException(status_code=404, detail="Scan record not found")
 
     if scan.get("status") == "failed":
-        return {"status": "failed", "error": scan.get("error") or "Scan failed"}
+        return {
+            "status": "failed",
+            "error": scan.get("error") or "Scan failed",
+            "progress": scan.get("progress_percent"),
+        }
 
     if scan.get("status") == "finished" and scan.get("parsed_report"):
-        return {"status": "finished", "result": scan["parsed_report"]}
+        return {
+            "status": "finished",
+            "result": scan["parsed_report"],
+            "progress": scan.get("progress_percent", 100),
+        }
 
     try:
         job = Job.fetch(job_id, connection=redis_conn)
@@ -419,8 +504,8 @@ def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
         error_message = "Scan job failed"
         if job.exc_info:
             error_message = job.exc_info.strip().splitlines()[-1]
-        _update_scan_result(scan["id"], user_id, "failed", None, None, error_message)
-        return {"status": status, "error": error_message}
+        _update_scan_result(scan["id"], user_id, "failed", None, None, error_message, progress_percent=100)
+        return {"status": status, "error": error_message, "progress": 100}
 
     if status == "finished":
         try:
@@ -435,7 +520,11 @@ def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
         auth_status = _extract_auth_status(job.result)
         if isinstance(auth_status, dict):
             parsed["authStatus"] = auth_status
-        _update_scan_result(scan["id"], user_id, "finished", raw_report, parsed, None)
-        return {"status": status, "result": parsed}
+        _update_scan_result(scan["id"], user_id, "finished", raw_report, parsed, None, progress_percent=100)
+        return {"status": status, "result": parsed, "progress": 100}
 
-    return {"status": status, "result": None}
+    return {
+        "status": status,
+        "result": None,
+        "progress": scan.get("progress_percent"),
+    }

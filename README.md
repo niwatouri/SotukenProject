@@ -3,10 +3,11 @@ vulnerability scanner
 
 ## Setup
 1) `.env` に `JWT_SECRET` を設定（`login` と `backend` で共有）
-2) `docker compose up --build`
-3) フロントから認証APIの向き先を変える場合は `VITE_AUTH_URL` を設定（未設定時は `http://localhost:3000`）
-4) `login` の依存追加後は `docker compose up --build login` で再作成
-5) 既存のDBボリュームを使っている場合は、以下で新しいテーブルを反映  
+2) `ZAP_SCANNER_API_KEY` を設定（設定時は backend→zap-scanner のみ許可）
+3) `docker compose up --build`
+4) フロントから認証APIの向き先を変える場合は `VITE_AUTH_URL` を設定（未設定時は `http://localhost:3000`）
+5) `login` の依存追加後は `docker compose up --build login` で再作成
+6) 既存のDBボリュームを使っている場合は、以下で新しいテーブルを反映  
    `docker compose exec db psql -U postgres -d mydb -f /docker-entrypoint-initdb.d/init.sql`
 
 ## Scaling (zap-scanner)

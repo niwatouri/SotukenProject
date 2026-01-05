@@ -1,7 +1,9 @@
+import json
 import os
 import re
 import threading
 import time
+import urllib.request
 from urllib.parse import quote, urlparse
 from zapv2 import ZAPv2
 from flask import Flask, request, jsonify
@@ -9,7 +11,9 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 ZAP_API_KEY = os.getenv('ZAP_API_KEY')
+ZAP_SCANNER_API_KEY = os.getenv('ZAP_SCANNER_API_KEY')
 ZAP_PROXY = 'http://127.0.0.1:8090'
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
 SPIDER_MAX_DURATION_MINUTES = int(os.getenv("SPIDER_MAX_DURATION_MINUTES", "20"))
 SPIDER_MAX_DEPTH = int(os.getenv("SPIDER_MAX_DEPTH", "5"))
 SPIDER_MAX_CHILDREN = int(os.getenv("SPIDER_MAX_CHILDREN", "0"))
@@ -26,6 +30,29 @@ zap = ZAPv2(
 )
 
 SCAN_LOCK = threading.Lock()
+
+
+def _post_json(url, payload, headers=None, timeout=2):
+    body = json.dumps(payload).encode("utf-8")
+    request_headers = {"Content-Type": "application/json"}
+    if headers:
+        request_headers.update(headers)
+    req = urllib.request.Request(url, data=body, headers=request_headers, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return response.read()
+
+
+def _report_progress(scan_id, percent, phase=None):
+    if not scan_id:
+        return
+    payload = {"scan_id": scan_id, "progress_percent": percent}
+    if phase:
+        payload["phase"] = phase
+    headers = {"X-API-Key": ZAP_SCANNER_API_KEY} if ZAP_SCANNER_API_KEY else None
+    try:
+        _post_json(f"{BACKEND_URL}/scan-progress", payload, headers=headers)
+    except Exception:
+        pass
 
 # 脆弱性タイプ → plugin ID
 VULN_TYPE_IDS = {
@@ -144,7 +171,15 @@ def _safe_stop_scan(stop_func, scan_id):
         pass
 
 
-def _poll_scan_status(status_func, scan_id, sleep_seconds, label, max_seconds=None, stop_func=None):
+def _poll_scan_status(
+    status_func,
+    scan_id,
+    sleep_seconds,
+    label,
+    max_seconds=None,
+    stop_func=None,
+    progress_callback=None,
+):
     start_time = time.time()
     while True:
         if max_seconds is not None and (time.time() - start_time) > max_seconds:
@@ -162,6 +197,11 @@ def _poll_scan_status(status_func, scan_id, sleep_seconds, label, max_seconds=No
         except (TypeError, ValueError):
             _safe_stop_scan(stop_func, scan_id)
             return False, f"{label} のステータスが不正です: {status_value}"
+        if progress_callback:
+            try:
+                progress_callback(status_int)
+            except Exception:
+                pass
         if status_int >= 100:
             return True, None
         time.sleep(sleep_seconds)
@@ -438,10 +478,28 @@ def _apply_cookie_auth(cookie_value):
     )
 
 
+def _check_request_api_key():
+    if not ZAP_SCANNER_API_KEY:
+        return True, None, None
+    header_key = request.headers.get("X-API-Key")
+    if not header_key:
+        return False, "Missing API key", 401
+    if header_key != ZAP_SCANNER_API_KEY:
+        return False, "Invalid API key", 403
+    return True, None, None
+
+
 @app.route('/scan', methods=['POST'])
 def scan():
+    authorized, error_message, error_status = _check_request_api_key()
+    if not authorized:
+        return jsonify({"error": error_message}), error_status
+
     data = request.get_json()
     target = data.get('url')
+    scan_id = None
+    if isinstance(data, dict):
+        scan_id = data.get("scan_id")
     scan_types = data.get('scan_types', [])
     if not isinstance(scan_types, list):
         scan_types = []
@@ -455,6 +513,19 @@ def scan():
     lock_acquired = SCAN_LOCK.acquire(blocking=False)
     if not lock_acquired:
         return jsonify({"error": "scanner busy"}), 429
+
+    progress_state = {"last": -1}
+
+    def report_progress(percent, phase=None):
+        try:
+            percent_int = int(percent)
+        except (TypeError, ValueError):
+            return
+        percent_int = max(0, min(99, percent_int))
+        if percent_int <= progress_state["last"]:
+            return
+        progress_state["last"] = percent_int
+        _report_progress(scan_id, percent_int, phase)
 
     print(f"[*] Start scan target={target}, scan_types={scan_types}")
 
@@ -483,6 +554,7 @@ def scan():
     user_context = None
 
     try:
+        report_progress(5, "starting")
         if isinstance(auth_config, dict):
             method = auth_config.get("method")
             try:
@@ -555,6 +627,9 @@ def scan():
         if not spider_id:
             raise RuntimeError("Spider start failed")
 
+        def spider_progress(status_value):
+            report_progress(5 + int(status_value * 0.4), "spider")
+
         spider_completed, spider_message = _poll_scan_status(
             zap.spider.status,
             spider_id,
@@ -562,6 +637,7 @@ def scan():
             "Spider",
             max_seconds=SPIDER_MAX_DURATION_MINUTES * 60,
             stop_func=zap.spider.stop,
+            progress_callback=spider_progress,
         )
         if not spider_completed and spider_message:
             _append_auth_message(auth_status, spider_message)
@@ -636,6 +712,9 @@ def scan():
         if not ascan_id:
             _mark_auth_fallback(auth_status, "アクティブスキャン開始に失敗したためスキャンを継続します（結果が不完全な可能性があります）")
         else:
+            def ascan_progress(status_value):
+                report_progress(45 + int(status_value * 0.5), "active")
+
             ascan_completed, ascan_message = _poll_scan_status(
                 zap.ascan.status,
                 ascan_id,
@@ -643,6 +722,7 @@ def scan():
                 "Active Scan",
                 max_seconds=ASCAN_MAX_DURATION_MINUTES * 60,
                 stop_func=zap.ascan.stop,
+                progress_callback=ascan_progress,
             )
             if ascan_completed:
                 active_scan_ran = True
@@ -660,6 +740,7 @@ def scan():
                             "Active Scan",
                             max_seconds=ASCAN_MAX_DURATION_MINUTES * 60,
                             stop_func=zap.ascan.stop,
+                            progress_callback=ascan_progress,
                         )
                         if fallback_completed:
                             active_scan_ran = True
@@ -694,6 +775,7 @@ def scan():
         if lock_acquired:
             SCAN_LOCK.release()
 
+    report_progress(99, "reporting")
     # レポート取得
     report = zap.core.jsonreport(apikey=ZAP_API_KEY)
 

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS scans (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
+  progress_percent INTEGER NOT NULL DEFAULT 0,
   error TEXT,
   raw_report JSONB,
   parsed_report JSONB
