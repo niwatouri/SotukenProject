@@ -150,6 +150,18 @@ function Dashboard() {
     }
   };
 
+  const authStatus = scanResults.authStatus;
+  const authStatusLabel = authStatus?.success === true
+    ? '認証: 成功'
+    : authStatus?.success === false
+      ? '認証: 失敗'
+      : '認証: 未検証';
+  const authStatusClass = authStatus?.success === true
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+    : authStatus?.success === false
+      ? 'border-amber-200 bg-amber-50 text-amber-900'
+      : 'border-slate-200 bg-slate-50 text-slate-700';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* Header */}
@@ -220,6 +232,17 @@ function Dashboard() {
 
         {activeView === 'dashboard' ? (
           <div key="dashboard-content">
+            {authStatus?.used && (
+              <div className={`mb-6 flex items-start space-x-3 rounded-xl border px-4 py-3 ${authStatusClass}`}>
+                <AlertTriangle className="mt-0.5 h-5 w-5" />
+                <div className="text-sm">
+                  <p className="font-semibold">{authStatusLabel}</p>
+                  <p className="opacity-80">
+                    {authStatus.message || '認証結果の詳細はログイン成功判定の設定に依存します。'}
+                  </p>
+                </div>
+              </div>
+            )}
             {/* Scan Info */}
             <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-slate-200">
               <div className="flex items-center justify-between mb-6">

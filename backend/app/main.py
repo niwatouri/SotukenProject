@@ -13,6 +13,8 @@ from app.report_parser import parse_zap_report
 from app.tasks import zap_scan_task
 from rq.job import Job
 
+SCAN_TIMEOUT_SECONDS = int(os.getenv("SCAN_TIMEOUT_SECONDS", "3600"))
+
 app = FastAPI()
 
 
@@ -23,7 +25,7 @@ def _init_schema() -> None:
 # Redis接続
 redis_conn = Redis(host="redis", port=6379)
 # 長時間スキャンに耐えるよう、デフォルトタイムアウトを伸ばしてキューを作成
-q = Queue(connection=redis_conn, default_timeout=1200)
+q = Queue(connection=redis_conn, default_timeout=SCAN_TIMEOUT_SECONDS)
 
 # --- ✅ CORS設定 ---
 app.add_middleware(
@@ -216,6 +218,7 @@ async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
     data = await request.json()
     url = data.get("url")
     scan_types = data.get("scan_types")
+    auth = data.get("auth")
     user_id = user.get("userId")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid user payload")
@@ -229,10 +232,10 @@ async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
 
     scan_id = _create_scan_record(user_id, url, scan_types, "running")
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(1200)) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(SCAN_TIMEOUT_SECONDS)) as client:
         resp = await client.post(
             f"{ZAP_SCANNER_URL}/scan",
-            json={"url": url, "scan_types": scan_types}
+            json={"url": url, "scan_types": scan_types, "auth": auth}
         )
         if resp.status_code != 200:
             _update_scan_result(scan_id, user_id, "failed", None, None, resp.text)
@@ -240,6 +243,7 @@ async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
 
         data = resp.json()
         raw_report = _normalize_report(data.get("report"))
+        auth_status = data.get("auth_status") if isinstance(data, dict) else None
         if raw_report is None:
             _update_scan_result(scan_id, user_id, "failed", None, None, "Report payload missing or invalid")
             raise HTTPException(status_code=500, detail="Report payload missing or invalid")
@@ -249,6 +253,8 @@ async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
             default_scan_type=_scan_type_from_scan_types(scan_types),
             default_target_url=url,
         )
+        if isinstance(auth_status, dict):
+            parsed_report["authStatus"] = auth_status
         _update_scan_result(scan_id, user_id, "finished", raw_report, parsed_report, None)
         return data
 
@@ -306,6 +312,7 @@ async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_au
     data = await request.json()
     url = data.get("url")
     scan_types = data.get("scan_types")
+    auth = data.get("auth")
     user_id = user.get("userId")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid user payload")
@@ -319,7 +326,16 @@ async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_au
 
     try:
         # 600秒タイムアウトのhttpx呼び出しより余裕を持たせてジョブタイムアウトを設定
-        job = q.enqueue(zap_scan_task, scan_id, url, scan_types, user_id, job_timeout=1200)
+        job = q.enqueue(
+            zap_scan_task,
+            scan_id,
+            url,
+            scan_types,
+            user_id,
+            auth,
+            job_timeout=SCAN_TIMEOUT_SECONDS,
+            description=f"zap_scan_task(scan_id={scan_id}, user_id={user_id})",
+        )
     except Exception as exc:
         _update_scan_result(scan_id, user_id, "failed", None, None, f"Queue enqueue failed: {exc}")
         raise HTTPException(status_code=500, detail="Failed to queue scan") from exc
@@ -366,6 +382,15 @@ def _extract_raw_report(job_result: Any) -> Optional[Dict[str, Any]]:
     return _normalize_report(report_payload)
 
 
+def _extract_auth_status(job_result: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(job_result, dict):
+        return None
+    status = job_result.get("auth_status")
+    if status is None and isinstance(job_result.get("response"), dict):
+        status = job_result["response"].get("auth_status")
+    return status if isinstance(status, dict) else None
+
+
 # --- RQ結果取得 ---
 @app.get("/scan-result/{job_id}")
 def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
@@ -407,6 +432,9 @@ def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
             return {"status": status, "error": "Scan result unavailable"}
 
         raw_report = _extract_raw_report(job.result)
+        auth_status = _extract_auth_status(job.result)
+        if isinstance(auth_status, dict):
+            parsed["authStatus"] = auth_status
         _update_scan_result(scan["id"], user_id, "finished", raw_report, parsed, None)
         return {"status": status, "result": parsed}
 

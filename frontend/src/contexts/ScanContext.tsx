@@ -18,12 +18,46 @@ export interface ScanResults {
   openPorts: number[];
   vulnerabilities: VulnerabilityData[];
   riskScore: number;
+  authStatus?: {
+    used: boolean;
+    method?: string;
+    success?: boolean;
+    message?: string;
+  };
 }
+
+export type ScanAuthConfig =
+  | {
+      method: 'form';
+      login_url: string;
+      username: string;
+      password: string;
+      login_indicator?: string;
+      username_field?: string;
+      password_field?: string;
+      extra_params?: string;
+      login_request_data?: string;
+    }
+  | {
+      method: 'cookie';
+      cookie: string;
+    }
+  | {
+      method: 'header';
+      header: string;
+    }
+  | null;
 
 interface ScanContextType {
   scanResults: ScanResults | null;
   isScanning: boolean;
-  startScan: (url: string, scanType: 'bulk' | 'detailed', scanTypes?: string[]) => Promise<boolean>;
+  scanProgress: number;
+  startScan: (
+    url: string,
+    scanType: 'bulk' | 'detailed',
+    scanTypes?: string[],
+    auth?: ScanAuthConfig
+  ) => Promise<boolean>;
   clearResults: () => void;
 }
 
@@ -56,6 +90,7 @@ const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, 8000);
 export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
 
   const isValidScanResults = (data: any): data is ScanResults => {
     return !!data &&
@@ -76,13 +111,16 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   const startScan = async (
     url: string,
     scanType: 'bulk' | 'detailed',
-    scanTypes?: string[]
+    scanTypes?: string[],
+    auth?: ScanAuthConfig
   ): Promise<boolean> => {
     setIsScanning(true);
     setScanResults(null);
+    setScanProgress(0);
 
     try {
       const payloadScanTypes = scanTypes && scanTypes.length > 0 ? scanTypes : ['all'];
+      const startTime = Date.now();
 
       const response = await fetch(`${API_BASE_URL}/start-scan/`, {
         method: 'POST',
@@ -94,6 +132,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
           url,
           scan_type: scanType,
           scan_types: payloadScanTypes,
+          auth: auth ?? null,
         }),
       });
 
@@ -108,9 +147,11 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
 
       console.log('✅ スキャンジョブ投入:', jobId);
 
-      const maxWaitMs = 20 * 60 * 1000; // 20分まで待機
+      const maxWaitMs = 60 * 60 * 1000; // 60分まで待機
       const pollIntervalMs = 5000;
-      const startTime = Date.now();
+      const bumpProgress = (value: number) => {
+        setScanProgress(prev => Math.max(prev, Math.min(100, value)));
+      };
 
       while (true) {
         if (Date.now() - startTime > maxWaitMs) {
@@ -128,6 +169,15 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
 
         const resultData = await resultRes.json();
         const { status, result, error } = resultData;
+        if (status === 'queued') {
+          bumpProgress(2);
+        } else if (status === 'started') {
+          bumpProgress(5);
+        } else {
+          const elapsed = Date.now() - startTime;
+          const estimated = Math.floor((elapsed / maxWaitMs) * 100);
+          bumpProgress(Math.min(95, estimated));
+        }
 
         if (status === 'finished') {
           if (error) {
@@ -136,6 +186,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
           if (!isValidScanResults(result)) {
             throw new Error('スキャン結果の形式が想定と異なります');
           }
+          bumpProgress(100);
           setScanResults(result);
           return true;
         }
@@ -154,6 +205,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
       return false;
     } finally {
       setIsScanning(false);
+      setScanProgress(0);
     }
 
     return false;
@@ -164,7 +216,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ScanContext.Provider value={{ scanResults, isScanning, startScan, clearResults }}>
+    <ScanContext.Provider value={{ scanResults, isScanning, scanProgress, startScan, clearResults }}>
       {children}
     </ScanContext.Provider>
   );

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Globe, Settings, Scan, AlertTriangle, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useScan } from '../contexts/ScanContext';
+import { useScan, ScanAuthConfig } from '../contexts/ScanContext';
 import ScanConfirmModal from '../components/ScanConfirmModal';
 import Footer from '../components/Footer';
 
@@ -18,6 +18,20 @@ function Home() {
     xss: true,
     portScan: true,
   });
+  const [useAuthScan, setUseAuthScan] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'form' | 'cookie' | 'header'>('form');
+  const [formAuth, setFormAuth] = useState({
+    loginUrl: '',
+    username: '',
+    password: '',
+    loginIndicator: '',
+    usernameField: 'username',
+    passwordField: 'password',
+    extraParams: '',
+    loginRequestData: '',
+  });
+  const [cookieAuth, setCookieAuth] = useState({ cookie: '' });
+  const [headerAuth, setHeaderAuth] = useState({ header: '' });
   const [error, setError] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
@@ -42,7 +56,7 @@ function Home() {
   // ----------------------------------------
 
   const { logout, user } = useAuth();
-  const { startScan, isScanning } = useScan();
+  const { startScan, isScanning, scanProgress } = useScan();
   const navigate = useNavigate();
 
   const handleScanOptionChange = (option: keyof typeof scanOptions) => {
@@ -95,7 +109,46 @@ function Home() {
           .filter(Boolean)
       : ['all'];
 
-    const success = await startScan(targetUrl, scanType, selectedScanTypes);
+    let authPayload: ScanAuthConfig = null;
+    if (scanType === 'detailed' && useAuthScan) {
+      if (authMethod === 'form') {
+        if (!formAuth.loginUrl || !formAuth.username || !formAuth.password) {
+          setError('フォーム認証のURL・ユーザー名・パスワードを入力してください');
+          return;
+        }
+        authPayload = {
+          method: 'form',
+          login_url: formAuth.loginUrl,
+          username: formAuth.username,
+          password: formAuth.password,
+          login_indicator: formAuth.loginIndicator || undefined,
+          username_field: formAuth.usernameField || undefined,
+          password_field: formAuth.passwordField || undefined,
+          extra_params: formAuth.extraParams || undefined,
+          login_request_data: formAuth.loginRequestData || undefined,
+        };
+      } else if (authMethod === 'cookie') {
+        if (!cookieAuth.cookie) {
+          setError('セッションCookieを入力してください');
+          return;
+        }
+        authPayload = {
+          method: 'cookie',
+          cookie: cookieAuth.cookie,
+        };
+      } else {
+        if (!headerAuth.header) {
+          setError('Authorizationヘッダの値を入力してください');
+          return;
+        }
+        authPayload = {
+          method: 'header',
+          header: headerAuth.header,
+        };
+      }
+    }
+
+    const success = await startScan(targetUrl, scanType, selectedScanTypes, authPayload);
     if (success) {
       navigate('/dashboard');
     }
@@ -128,7 +181,16 @@ function Home() {
             autoplay
             style={{ width: '300px', height: '300px' }}
           ></dotlottie-player>
-          <p className="load mt-4 text-lg font-medium text-gray-700">キュー投入/スキャン中・・・</p>
+          <p className="load mt-4 text-lg font-medium text-gray-700">スキャン中・・・</p>
+          <div className="mt-4 w-64">
+            <div className="h-2 w-full rounded-full bg-gray-200">
+              <div
+                className="h-2 rounded-full bg-blue-600 transition-all"
+                style={{ width: `${scanProgress}%` }}
+              ></div>
+            </div>
+            <p className="mt-2 text-center text-sm text-gray-600">{scanProgress}%</p>
+          </div>
         </div>
       )}
 
@@ -230,6 +292,165 @@ function Home() {
                       </div>
                     </label>
                   ))}
+                </div>
+
+                <div className="mt-8 border-t border-slate-200 pt-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">認証設定</h4>
+                  <div className="flex items-center space-x-6 mb-4">
+                    <label className="flex items-center space-x-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="useAuth"
+                        checked={!useAuthScan}
+                        onChange={() => setUseAuthScan(false)}
+                        className="w-4 h-4 text-blue-600 border-gray-300"
+                      />
+                      <span>認証を使わない</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="useAuth"
+                        checked={useAuthScan}
+                        onChange={() => setUseAuthScan(true)}
+                        className="w-4 h-4 text-blue-600 border-gray-300"
+                      />
+                      <span>認証を使う</span>
+                    </label>
+                  </div>
+
+                  {useAuthScan && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">認証方式</label>
+                        <select
+                          value={authMethod}
+                          onChange={(e) => setAuthMethod(e.target.value as 'form' | 'cookie' | 'header')}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="form">フォーム認証</option>
+                          <option value="cookie">セッションCookie</option>
+                          <option value="header">Authorizationヘッダ</option>
+                        </select>
+                      </div>
+
+                      {authMethod === 'form' && (
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">ログインURL</label>
+                            <input
+                              type="url"
+                              value={formAuth.loginUrl}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, loginUrl: e.target.value }))}
+                              placeholder="https://example.com/login"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">ユーザー名</label>
+                            <input
+                              type="text"
+                              value={formAuth.username}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, username: e.target.value }))}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+                            <input
+                              type="password"
+                              value={formAuth.password}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, password: e.target.value }))}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">ログイン成功判定（任意）</label>
+                            <input
+                              type="text"
+                              value={formAuth.loginIndicator}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, loginIndicator: e.target.value }))}
+                              placeholder="例: Logout"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">ログイン成功後のHTMLに含まれる文字列を指定します。</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">ユーザー名フィールド名（任意）</label>
+                            <input
+                              type="text"
+                              value={formAuth.usernameField}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, usernameField: e.target.value }))}
+                              placeholder="username"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">パスワードフィールド名（任意）</label>
+                            <input
+                              type="text"
+                              value={formAuth.passwordField}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, passwordField: e.target.value }))}
+                              placeholder="password"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">追加パラメータ（任意）</label>
+                            <input
+                              type="text"
+                              value={formAuth.extraParams}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, extraParams: e.target.value }))}
+                              placeholder="csrf=xxxx&remember=1"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">必要な場合のみ、フォーム送信パラメータを追加します。</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">loginRequestData 直接指定（任意）</label>
+                            <input
+                              type="text"
+                              value={formAuth.loginRequestData}
+                              onChange={(e) => setFormAuth(prev => ({ ...prev, loginRequestData: e.target.value }))}
+                              placeholder="username=%username%&password=%password%&csrf=xxxx"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">上級者向け。入力するとフィールド名/追加パラメータより優先されます。</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {authMethod === 'cookie' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">セッションCookie</label>
+                          <input
+                            type="text"
+                            value={cookieAuth.cookie}
+                            onChange={(e) => setCookieAuth({ cookie: e.target.value })}
+                            placeholder="SESSIONID=abc123; Path=/; HttpOnly"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      )}
+
+                      {authMethod === 'header' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Authorizationヘッダ値</label>
+                          <input
+                            type="text"
+                            value={headerAuth.header}
+                            onChange={(e) => setHeaderAuth({ header: e.target.value })}
+                            placeholder="Bearer xxxxx"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      )}
+
+                      <p className="text-xs text-gray-500">
+                        認証情報はスキャン実行中のみ使用され、保存されません。
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

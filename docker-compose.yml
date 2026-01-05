@@ -72,6 +72,12 @@ services:
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
       - JWT_SECRET=${JWT_SECRET}
+      - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS}
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
     networks:
       - zapnet
 
@@ -85,8 +91,14 @@ services:
       - redis
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
+      - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
     volumes:
       - ./reports:/reports
     networks:
@@ -109,6 +121,15 @@ services:
     container_name: zap-scanner
     environment:
       - ZAP_API_KEY=${ZAP_API_KEY}
+      - SPIDER_MAX_DURATION_MINUTES=${SPIDER_MAX_DURATION_MINUTES}
+      - SPIDER_MAX_DEPTH=${SPIDER_MAX_DEPTH}
+      - SPIDER_MAX_CHILDREN=${SPIDER_MAX_CHILDREN}
+      - SPIDER_THREAD_COUNT=${SPIDER_THREAD_COUNT}
+      - ASCAN_MAX_DURATION_MINUTES=${ASCAN_MAX_DURATION_MINUTES}
+      - ASCAN_MAX_RULE_DURATION_MINUTES=${ASCAN_MAX_RULE_DURATION_MINUTES}
+      - ASCAN_MAX_RESULTS=${ASCAN_MAX_RESULTS}
+      - ASCAN_THREADS_PER_HOST=${ASCAN_THREADS_PER_HOST}
+      - ASCAN_DELAY_IN_MS=${ASCAN_DELAY_IN_MS}
     volumes:
       - ./reports:/reports
     ports:

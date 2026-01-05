@@ -5,3 +5,4 @@ httpx
 redis 
 rq==1.15.1
 PyJWT
+psycopg2-binary
