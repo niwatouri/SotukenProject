@@ -9,7 +9,10 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ScanProvider } from './contexts/ScanContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAuthReady } = useAuth();
+  if (!isAuthReady) {
+    return null;
+  }
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 }
 

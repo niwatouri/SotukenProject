@@ -33,7 +33,7 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: mydb
       DB_PORT: 5432
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
     ports:
       - "3000:3000"
@@ -71,7 +71,7 @@ services:
       - zap-scanner
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - ZAP_SCANNER_API_KEY=${ZAP_SCANNER_API_KEY}
       - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS}
       - DB_HOST=${DB_HOST}

@@ -2,26 +2,178 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Shield, AlertTriangle, Activity, Globe, Download, Brain, Home, Clock, Target, BarChart3, CheckCircle, Lightbulb } from 'lucide-react';
-import { useScan } from '../contexts/ScanContext';
+import { ScanHistoryItem, useScan } from '../contexts/ScanContext';
 import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
 import { useAuth } from '../contexts/AuthContext';
 import { jsPDF } from 'jspdf';
 import Footer from '../components/Footer';
 
 function Dashboard() {
-  const { scanResults } = useScan();
+  const { scanResults, loadScanById, loadScanHistory } = useScan();
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState<'dashboard' | 'ai'>('dashboard');
+  const [historyScans, setHistoryScans] = useState<ScanHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [loadingScanId, setLoadingScanId] = useState<number | null>(null);
 
   // Scroll to top when component mounts or view changes
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [activeView]);
 
+  useEffect(() => {
+    if (scanResults) {
+      return;
+    }
+    let isActive = true;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    loadScanHistory()
+      .then((scans) => {
+        if (!isActive) {
+          return;
+        }
+        setHistoryScans(scans);
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+        setHistoryError('履歴を取得できませんでした');
+      })
+      .finally(() => {
+        if (!isActive) {
+          return;
+        }
+        setHistoryLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [scanResults, loadScanHistory]);
+
+  const handleLoadScan = async (scanId: number) => {
+    setLoadingScanId(scanId);
+    const ok = await loadScanById(scanId);
+    setLoadingScanId(null);
+    if (!ok) {
+      alert('スキャン結果を取得できませんでした');
+    }
+  };
+
   if (!scanResults) {
-    navigate('/home');
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+        {/* Header */}
+        <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-3">
+                <Shield className="w-8 h-8 text-blue-600" />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">SecureGuard</h1>
+                  <p className="text-sm text-gray-600">レポートダッシュボード</p>
+                </div>
+              </div>
+
+              <nav className="flex items-center space-x-4">
+                <button
+                  onClick={() => navigate('/home')}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                >
+                  <Home className="w-4 h-4" />
+                  <span>ホーム</span>
+                </button>
+              </nav>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">{user?.email}</span>
+              <button
+                onClick={logout}
+                className="text-sm text-gray-600 hover:text-red-600 transition-colors"
+              >
+                ログアウト
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-5xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">スキャン履歴</h2>
+              <button
+                onClick={() => navigate('/home')}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                新しいスキャンへ
+              </button>
+            </div>
+
+            {historyLoading && (
+              <p className="text-sm text-gray-600">履歴を読み込み中...</p>
+            )}
+            {historyError && (
+              <p className="text-sm text-red-600">{historyError}</p>
+            )}
+
+            {!historyLoading && historyScans.length === 0 && !historyError && (
+              <p className="text-sm text-gray-600">表示できる履歴がありません。</p>
+            )}
+
+            {historyScans.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-2 pr-4">対象URL</th>
+                      <th className="py-2 pr-4">ステータス</th>
+                      <th className="py-2 pr-4">日時</th>
+                      <th className="py-2 pr-4">ID</th>
+                      <th className="py-2 pr-4">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyScans.map((scan) => (
+                      <tr key={scan.id} className="border-b last:border-b-0">
+                        <td className="py-3 pr-4 text-gray-900">
+                          {scan.target_url}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className="text-gray-700">{scan.status}</span>
+                        </td>
+                        <td className="py-3 pr-4 text-gray-600">
+                          {scan.created_at ? new Date(scan.created_at).toLocaleString('ja-JP') : '-'}
+                        </td>
+                        <td className="py-3 pr-4 text-gray-600">{scan.id}</td>
+                        <td className="py-3 pr-4">
+                          <button
+                            disabled={scan.status !== 'finished' || loadingScanId === scan.id}
+                            onClick={() => handleLoadScan(scan.id)}
+                            className={`px-3 py-1 rounded-md text-xs font-medium ${
+                              scan.status === 'finished'
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            {loadingScanId === scan.id ? '読込中...' : '表示'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
   const severityColors = {

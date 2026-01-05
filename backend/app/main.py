@@ -19,6 +19,8 @@ app = FastAPI()
 
 @app.on_event("startup")
 def _init_schema() -> None:
+    if not JWT_SECRET or not JWT_SECRET.strip():
+        raise RuntimeError("JWT_SECRET is required and must be non-empty.")
     init_scan_schema()
 
 # Redis接続
@@ -36,7 +38,7 @@ app.add_middleware(
 )
 
 ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
-JWT_SECRET = os.getenv("JWT_SECRET") or "dev-secret"
+JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 
 
@@ -203,6 +205,25 @@ def _fetch_latest_report(user_id: int) -> Optional[Dict[str, Any]]:
             return row["parsed_report"] if row else None
 
 
+def _fetch_latest_scan(user_id: int) -> Optional[Dict[str, Any]]:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, target_url, scan_types, status, job_id, created_at,
+                       started_at, completed_at, error, parsed_report
+                FROM scans
+                WHERE user_id = %s
+                  AND status = 'finished'
+                  AND parsed_report IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            return cur.fetchone()
+
+
 def _update_scan_progress(scan_id: int, progress_percent: int) -> None:
     progress_percent = max(0, min(99, int(progress_percent)))
     with get_db_connection() as conn:
@@ -241,6 +262,18 @@ def list_scans(limit: int = 20, offset: int = 0, user: Dict[str, Any] = Depends(
     safe_offset = max(0, offset)
     scans = _fetch_scans(user_id, safe_limit, safe_offset)
     return {"scans": scans, "limit": safe_limit, "offset": safe_offset}
+
+
+@app.get("/scans/latest")
+def get_latest_scan(user: Dict[str, Any] = Depends(require_auth)):
+    user_id = user.get("userId")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user payload")
+
+    scan = _fetch_latest_scan(user_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return {"scan": scan}
 
 
 @app.get("/scans/{scan_id}")
@@ -405,10 +438,14 @@ def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
         try:
             parsed = _parse_job_result(job.result)
         except Exception as exc:
-            return {"status": status, "error": f"Failed to parse scan result: {exc}"}
+            error_message = f"Failed to parse scan result: {exc}"
+            _update_scan_result(scan["id"], user_id, "failed", None, None, error_message, progress_percent=100)
+            return {"status": "failed", "error": error_message, "progress": 100}
 
         if parsed is None:
-            return {"status": status, "error": "Scan result unavailable"}
+            error_message = "Scan result unavailable"
+            _update_scan_result(scan["id"], user_id, "failed", None, None, error_message, progress_percent=100)
+            return {"status": "failed", "error": error_message, "progress": 100}
 
         raw_report = _extract_raw_report(job.result)
         auth_status = _extract_auth_status(job.result)

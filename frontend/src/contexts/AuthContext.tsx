@@ -3,6 +3,7 @@ import { resolveBaseUrl } from '../utils/url';
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  isAuthReady: boolean;
   user: { email: string } | null;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (email: string, password: string, confirmPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -16,11 +17,13 @@ const TOKEN_STORAGE_KEY = 'auth_token';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (!token) {
+      setIsAuthReady(true);
       return;
     }
 
@@ -44,19 +47,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Invalid user payload');
         }
 
-        if (!isActive) {
-          return;
+        if (isActive) {
+          setIsAuthenticated(true);
+          setUser({ email });
         }
-
-        setIsAuthenticated(true);
-        setUser({ email });
       } catch (err) {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
-        if (!isActive) {
-          return;
+        if (isActive) {
+          setIsAuthenticated(false);
+          setUser(null);
         }
-        setIsAuthenticated(false);
-        setUser(null);
+      } finally {
+        if (isActive) {
+          setIsAuthReady(true);
+        }
       }
     };
 
@@ -143,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, signup, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isAuthReady, user, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { resolveBaseUrl } from '../utils/url';
 
 export interface VulnerabilityData {
@@ -27,6 +27,18 @@ export interface ScanResults {
   };
 }
 
+export interface ScanHistoryItem {
+  id: number;
+  target_url: string;
+  status: string;
+  created_at: string;
+  scan_types?: string[];
+  job_id?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error?: string | null;
+}
+
 export type ScanAuthConfig =
   | {
       method: 'form';
@@ -53,6 +65,9 @@ interface ScanContextType {
   scanResults: ScanResults | null;
   isScanning: boolean;
   scanProgress: number;
+  restoreLatestScan: () => Promise<boolean>;
+  loadScanHistory: () => Promise<ScanHistoryItem[]>;
+  loadScanById: (scanId: number) => Promise<boolean>;
   startScan: (
     url: string,
     scanTypes?: string[],
@@ -65,26 +80,105 @@ const ScanContext = createContext<ScanContextType | undefined>(undefined);
 const TOKEN_STORAGE_KEY = 'auth_token';
 const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, '/api');
 
+const isValidScanResults = (data: any): data is ScanResults => {
+  return !!data &&
+    typeof data.timestamp === 'string' &&
+    typeof data.targetUrl === 'string' &&
+    typeof data.scanType === 'string' &&
+    Array.isArray(data.openPorts) &&
+    Array.isArray(data.vulnerabilities) &&
+    typeof data.riskScore === 'number';
+};
+
 export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
 
-  const isValidScanResults = (data: any): data is ScanResults => {
-    return !!data &&
-      typeof data.timestamp === 'string' &&
-      typeof data.targetUrl === 'string' &&
-      typeof data.scanType === 'string' &&
-      Array.isArray(data.openPorts) &&
-      Array.isArray(data.vulnerabilities) &&
-      typeof data.riskScore === 'number';
-  };
-
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-  const getAuthHeaders = () => {
+  const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     return token ? { Authorization: `Bearer ${token}` } : {};
-  };
+  }, []);
+
+  const restoreLatestScan = useCallback(async (): Promise<boolean> => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      return false;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/scans/latest`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+      if (response.status === 404) {
+        return false;
+      }
+      if (!response.ok) {
+        return false;
+      }
+      const data = await response.json();
+      const parsed = data?.scan?.parsed_report;
+      if (!isValidScanResults(parsed)) {
+        return false;
+      }
+      setScanResults(parsed);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [getAuthHeaders]);
+
+  const loadScanHistory = useCallback(async (): Promise<ScanHistoryItem[]> => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      return [];
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/scans`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+      if (!response.ok) {
+        return [];
+      }
+      const data = await response.json();
+      if (!Array.isArray(data?.scans)) {
+        return [];
+      }
+      return data.scans as ScanHistoryItem[];
+    } catch {
+      return [];
+    }
+  }, [getAuthHeaders]);
+
+  const loadScanById = useCallback(async (scanId: number): Promise<boolean> => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      return false;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/scans/${scanId}`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+      if (!response.ok) {
+        return false;
+      }
+      const data = await response.json();
+      const parsed = data?.scan?.parsed_report;
+      if (!isValidScanResults(parsed)) {
+        return false;
+      }
+      setScanResults(parsed);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [getAuthHeaders]);
 
   const startScan = async (
     url: string,
@@ -194,8 +288,21 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     setScanResults(null);
   };
 
+  useEffect(() => {
+    void restoreLatestScan();
+  }, [restoreLatestScan]);
+
   return (
-    <ScanContext.Provider value={{ scanResults, isScanning, scanProgress, startScan, clearResults }}>
+    <ScanContext.Provider value={{
+      scanResults,
+      isScanning,
+      scanProgress,
+      restoreLatestScan,
+      loadScanHistory,
+      loadScanById,
+      startScan,
+      clearResults,
+    }}>
       {children}
     </ScanContext.Provider>
   );

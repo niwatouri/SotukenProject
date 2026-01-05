@@ -2,7 +2,8 @@
 vulnerability scanner
 
 ## Setup
-1) `.env` に `JWT_SECRET` を設定（`login` と `backend` で共有）
+1) `.env` に `JWT_SECRET` を必ず設定（`login` と `backend` で共通。未設定/空は起動失敗、`dev-secret` フォールバックなし）  
+   例: `openssl rand -hex 32`
 2) `ZAP_SCANNER_API_KEY` を設定（設定時は backend→zap-scanner のみ許可）
 3) `docker compose up --build`
 4) フロントから認証APIの向き先を変える場合は `VITE_AUTH_URL` を設定（未設定時は `http://localhost:3000`）
