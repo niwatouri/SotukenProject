@@ -1,33 +1,16 @@
 # backend/app/tasks.py
 import httpx
-import json
 import os
 import time
 from psycopg2.extras import Json
 from app.db import get_db_connection
 from app.report_parser import parse_zap_report
+from app.scan_utils import normalize_report, scan_type_from_scan_types
 
 ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
 ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
 SCAN_TIMEOUT_SECONDS = int(os.getenv("SCAN_TIMEOUT_SECONDS", "3600"))
 RETRY_BACKOFF_SECONDS = [2, 4, 8, 12, 20, 30]
-
-
-def _normalize_report(report_payload):
-    if isinstance(report_payload, dict):
-        return report_payload
-    if isinstance(report_payload, str):
-        try:
-            return json.loads(report_payload)
-        except json.JSONDecodeError:
-            return None
-    return None
-
-
-def _scan_type_from_scan_types(scan_types):
-    if isinstance(scan_types, list) and scan_types and "all" not in scan_types:
-        return "detailed"
-    return "bulk"
 
 
 def _update_scan_status(
@@ -127,7 +110,7 @@ def zap_scan_task(
         # Propagate a concise error so the worker marks the job as failed.
         raise Exception(f"ZAP scan failed: {exc}") from exc
 
-    raw_report = _normalize_report(data.get("report"))
+    raw_report = normalize_report(data.get("report"))
     auth_status = data.get("auth_status") if isinstance(data, dict) else None
     if raw_report is None:
         _update_scan_status(
@@ -141,7 +124,7 @@ def zap_scan_task(
 
     parsed_report = parse_zap_report(
         raw_report,
-        default_scan_type=_scan_type_from_scan_types(payload_scan_types),
+        default_scan_type=scan_type_from_scan_types(payload_scan_types),
         default_target_url=url,
     )
     if isinstance(auth_status, dict):

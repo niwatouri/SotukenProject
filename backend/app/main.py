@@ -1,21 +1,18 @@
-import asyncio
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 from rq import Queue
-import httpx
 import os
-import json
 from typing import Any, Dict, Optional
 import jwt
 from psycopg2.extras import Json
 from app.db import get_db_connection, init_scan_schema
 from app.report_parser import parse_zap_report
+from app.scan_utils import normalize_report, scan_type_from_scan_types
 from app.tasks import zap_scan_task
 from rq.job import Job
 
 SCAN_TIMEOUT_SECONDS = int(os.getenv("SCAN_TIMEOUT_SECONDS", "3600"))
-RETRY_BACKOFF_SECONDS = [2, 4, 8, 12, 20, 30]
 
 app = FastAPI()
 
@@ -38,7 +35,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
 ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
 JWT_SECRET = os.getenv("JWT_SECRET") or "dev-secret"
 JWT_ALGORITHM = "HS256"
@@ -81,23 +77,6 @@ def _verify_scanner_key(x_api_key: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Missing scanner API key")
     if x_api_key != ZAP_SCANNER_API_KEY:
         raise HTTPException(status_code=403, detail="Invalid scanner API key")
-
-
-def _normalize_report(report_payload: Any) -> Optional[Dict[str, Any]]:
-    if isinstance(report_payload, dict):
-        return report_payload
-    if isinstance(report_payload, str):
-        try:
-            return json.loads(report_payload)
-        except json.JSONDecodeError:
-            return None
-    return None
-
-
-def _scan_type_from_scan_types(scan_types: Any) -> str:
-    if isinstance(scan_types, list) and scan_types and "all" not in scan_types:
-        return "detailed"
-    return "bulk"
 
 
 def _create_scan_record(user_id: int, url: str, scan_types: list[str], status: str) -> int:
@@ -239,83 +218,6 @@ def _update_scan_progress(scan_id: int, progress_percent: int) -> None:
             )
 
 
-async def _post_scan_with_retry(client: httpx.AsyncClient, payload: Dict[str, Any], headers: Dict[str, str]) -> httpx.Response:
-    response = await client.post(
-        f"{ZAP_SCANNER_URL}/scan",
-        json=payload,
-        headers=headers,
-    )
-    if response.status_code != 429:
-        return response
-    for wait_seconds in RETRY_BACKOFF_SECONDS:
-        await asyncio.sleep(wait_seconds)
-        response = await client.post(
-            f"{ZAP_SCANNER_URL}/scan",
-            json=payload,
-            headers=headers,
-        )
-        if response.status_code != 429:
-            break
-    return response
-
-
-# --- ✅ /scan エンドポイント ---
-@app.post("/scan")
-async def scan(request: Request, user: Dict[str, Any] = Depends(require_auth)):
-    """
-    Deprecated: use /start-scan/ and /scan-result/{job_id} for async scans instead.
-    """
-    data = await request.json()
-    url = data.get("url")
-    scan_types = data.get("scan_types")
-    auth = data.get("auth")
-    user_id = user.get("userId")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid user payload")
-
-    if not url:
-        raise HTTPException(status_code=400, detail="URL is required")
-
-    # scan_types が配列でない/空の場合は全スキャン扱いにフォールバック
-    if not isinstance(scan_types, list) or len(scan_types) == 0:
-        scan_types = ["all"]
-
-    scan_id = _create_scan_record(user_id, url, scan_types, "running")
-
-    headers = {"X-API-Key": ZAP_SCANNER_API_KEY} if ZAP_SCANNER_API_KEY else {}
-    async with httpx.AsyncClient(timeout=httpx.Timeout(SCAN_TIMEOUT_SECONDS)) as client:
-        resp = await _post_scan_with_retry(
-            client,
-            {"url": url, "scan_types": scan_types, "auth": auth, "scan_id": scan_id},
-            headers,
-        )
-        if resp.status_code != 200:
-            error_message = (
-                "ZAP scanner busy after retries"
-                if resp.status_code == 429
-                else f"ZAP scan failed with status {resp.status_code}"
-            )
-            _update_scan_result(scan_id, user_id, "failed", None, None, error_message, progress_percent=100)
-            raise HTTPException(status_code=resp.status_code, detail=error_message)
-
-        data = resp.json()
-        raw_report = _normalize_report(data.get("report"))
-        auth_status = data.get("auth_status") if isinstance(data, dict) else None
-        if raw_report is None:
-            _update_scan_result(scan_id, user_id, "failed", None, None, "Report payload missing or invalid", progress_percent=100)
-            raise HTTPException(status_code=500, detail="Report payload missing or invalid")
-
-        parsed_report = parse_zap_report(
-            raw_report,
-            default_scan_type=_scan_type_from_scan_types(scan_types),
-            default_target_url=url,
-        )
-        if isinstance(auth_status, dict):
-            parsed_report["authStatus"] = auth_status
-        _update_scan_result(scan_id, user_id, "finished", raw_report, parsed_report, None, progress_percent=100)
-        return data
-
-
 # --- レポート取得 ---
 @app.get("/report")
 def get_report(user: Dict[str, Any] = Depends(require_auth)):
@@ -429,20 +331,12 @@ def _parse_job_result(job_result: Any) -> Optional[Dict[str, Any]]:
     if report_payload is None and isinstance(job_result.get("response"), dict):
         report_payload = job_result["response"].get("report")
 
-    if isinstance(report_payload, str):
-        try:
-            raw_report = json.loads(report_payload)
-        except json.JSONDecodeError:
-            return None
-    elif isinstance(report_payload, dict):
-        raw_report = report_payload
-    else:
+    raw_report = normalize_report(report_payload)
+    if raw_report is None:
         return None
 
     scan_types = job_result.get("scan_types") or (job_result.get("response") or {}).get("scan_types")
-    default_scan_type = "bulk"
-    if isinstance(scan_types, list) and scan_types and "all" not in scan_types:
-        default_scan_type = "detailed"
+    default_scan_type = scan_type_from_scan_types(scan_types)
 
     target_url = job_result.get("url") or (job_result.get("response") or {}).get("url")
     return parse_zap_report(raw_report, default_scan_type=default_scan_type, default_target_url=target_url)
@@ -456,7 +350,7 @@ def _extract_raw_report(job_result: Any) -> Optional[Dict[str, Any]]:
     if report_payload is None and isinstance(job_result.get("response"), dict):
         report_payload = job_result["response"].get("report")
 
-    return _normalize_report(report_payload)
+    return normalize_report(report_payload)
 
 
 def _extract_auth_status(job_result: Any) -> Optional[Dict[str, Any]]:

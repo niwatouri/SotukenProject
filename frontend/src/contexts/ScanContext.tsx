@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { resolveBaseUrl } from '../utils/url';
 
 export interface VulnerabilityData {
   id: string;
@@ -54,7 +55,6 @@ interface ScanContextType {
   scanProgress: number;
   startScan: (
     url: string,
-    scanType: 'bulk' | 'detailed',
     scanTypes?: string[],
     auth?: ScanAuthConfig
   ) => Promise<boolean>;
@@ -63,29 +63,7 @@ interface ScanContextType {
 
 const ScanContext = createContext<ScanContextType | undefined>(undefined);
 const TOKEN_STORAGE_KEY = 'auth_token';
-const resolveBaseUrl = (envValue: string | undefined, fallbackPort: number) => {
-  const defaultUrl = envValue || `http://localhost:${fallbackPort}`;
-
-  if (typeof window === 'undefined') {
-    return defaultUrl.replace(/\/$/, '');
-  }
-
-  try {
-    const parsed = new URL(defaultUrl);
-    const currentHost = window.location.hostname;
-    const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-
-    if (isLocalHost && currentHost && currentHost !== parsed.hostname) {
-      parsed.hostname = currentHost;
-    }
-
-    return parsed.origin;
-  } catch {
-    return defaultUrl.replace(/\/$/, '');
-  }
-};
-
-const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, 8000);
+const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, '/api');
 
 export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
@@ -110,7 +88,6 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
 
   const startScan = async (
     url: string,
-    scanType: 'bulk' | 'detailed',
     scanTypes?: string[],
     auth?: ScanAuthConfig
   ): Promise<boolean> => {
@@ -130,7 +107,6 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         },
         body: JSON.stringify({
           url,
-          scan_type: scanType,
           scan_types: payloadScanTypes,
           auth: auth ?? null,
         }),

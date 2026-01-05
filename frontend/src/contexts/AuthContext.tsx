@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { resolveBaseUrl } from '../utils/url';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -9,29 +10,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const resolveBaseUrl = (envValue: string | undefined, fallbackPort: number) => {
-  const defaultUrl = envValue || `http://localhost:${fallbackPort}`;
-
-  if (typeof window === 'undefined') {
-    return defaultUrl.replace(/\/$/, '');
-  }
-
-  try {
-    const parsed = new URL(defaultUrl);
-    const currentHost = window.location.hostname;
-    const isLocalHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-
-    if (isLocalHost && currentHost && currentHost !== parsed.hostname) {
-      parsed.hostname = currentHost;
-    }
-
-    return parsed.origin;
-  } catch {
-    return defaultUrl.replace(/\/$/, '');
-  }
-};
-
-const AUTH_BASE_URL = resolveBaseUrl(import.meta.env.VITE_AUTH_URL, 3000);
+const AUTH_BASE_URL = resolveBaseUrl(import.meta.env.VITE_AUTH_URL, 'http://localhost:3000');
 // ローカルストレージを使ってリロード後も状態を維持し、Cookie設定の差異を避ける。
 const TOKEN_STORAGE_KEY = 'auth_token';
 

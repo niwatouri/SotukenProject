@@ -148,7 +148,7 @@ function Home() {
       }
     }
 
-    const success = await startScan(targetUrl, scanType, selectedScanTypes, authPayload);
+    const success = await startScan(targetUrl, selectedScanTypes, authPayload);
     if (success) {
       navigate('/dashboard');
     }

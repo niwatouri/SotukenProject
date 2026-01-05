@@ -9,6 +9,7 @@ vulnerability scanner
 5) `login` の依存追加後は `docker compose up --build login` で再作成
 6) 既存のDBボリュームを使っている場合は、以下で新しいテーブルを反映  
    `docker compose exec db psql -U postgres -d mydb -f /docker-entrypoint-initdb.d/init.sql`
+7) Docker外で `login` を動かす場合は `DB_HOST=localhost` などの `DB_*` を設定してください
 
 ## Scaling (zap-scanner)
 - 同時実行は `zap-scanner` のスケール数に依存します（1インスタンス=1スキャン）
@@ -20,7 +21,7 @@ vulnerability scanner
 - `POST /register` / `POST /login` は `{ token, user: { userId, email } }` を返します
 - `GET /me` は `Authorization: Bearer <token>` でログイン状態を確認します
 - バックエンドの以下エンドポイントは認証必須です  
-  `/scan`, `/start-scan/`, `/scan-result/{job_id}`, `/report`, `/advice`
+  `/start-scan/`, `/scan-result/{job_id}`, `/report`, `/advice`
 - スキャン履歴API  
   `GET /scans` / `GET /scans/{scan_id}`
 
