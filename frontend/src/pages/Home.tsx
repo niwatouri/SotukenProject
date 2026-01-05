@@ -99,7 +99,7 @@ function Home() {
       sqlInjection: 'sqli',
       directoryTraversal: 'path_traversal',
       xss: 'xss',
-      portScan: 'all', // 未定義の場合は全体スキャンにフォールバック
+      portScan: 'port_scan',
     };
 
     const selectedScanTypes = scanType === 'detailed'

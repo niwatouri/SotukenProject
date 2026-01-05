@@ -5,7 +5,7 @@ import time
 from psycopg2.extras import Json
 from app.db import get_db_connection
 from app.report_parser import parse_zap_report
-from app.scan_utils import normalize_report, scan_type_from_scan_types
+from app.scan_utils import normalize_report, normalize_scan_types, scan_type_from_scan_types
 
 ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
 ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
@@ -66,7 +66,9 @@ def zap_scan_task(
     """
     Kick off a ZAP scan via the scanner service. Returns raw response data for later parsing.
     """
-    payload_scan_types = scan_types or ["all"]
+    payload_scan_types = normalize_scan_types(scan_types)
+    if not payload_scan_types:
+        payload_scan_types = ["all"]
     try:
         headers = {"X-API-Key": ZAP_SCANNER_API_KEY} if ZAP_SCANNER_API_KEY else {}
         _update_scan_status(scan_id, user_id, "running", error=None, progress_percent=5)
