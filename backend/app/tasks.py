@@ -7,10 +7,39 @@ from app.db import get_db_connection
 from app.report_parser import parse_zap_report
 from app.scan_utils import normalize_report, normalize_scan_types, scan_type_from_scan_types
 
+
+def _read_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    raw = raw.strip()
+    if not raw:
+        return default
+    return int(raw)
+
+
 ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
 ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
-SCAN_TIMEOUT_SECONDS = int(os.getenv("SCAN_TIMEOUT_SECONDS", "3600"))
-RETRY_BACKOFF_SECONDS = [2, 4, 8, 12, 20, 30]
+SCAN_TIMEOUT_SECONDS = _read_int_env("SCAN_TIMEOUT_SECONDS", 3600)
+
+
+def _build_retry_backoff(timeout_seconds: int) -> list[int]:
+    # Stretch retries so total wait is close to the scan timeout.
+    target_total = max(2, int(timeout_seconds * 0.9))
+    backoff_seconds: list[int] = []
+    wait_seconds = 2
+    total_wait = 0
+    while total_wait + wait_seconds < target_total:
+        backoff_seconds.append(wait_seconds)
+        total_wait += wait_seconds
+        wait_seconds = min(wait_seconds * 2, 300)
+    remaining = target_total - total_wait
+    if remaining > 0:
+        backoff_seconds.append(remaining)
+    return backoff_seconds
+
+
+RETRY_BACKOFF_SECONDS = _build_retry_backoff(SCAN_TIMEOUT_SECONDS)
 
 
 def _update_scan_status(

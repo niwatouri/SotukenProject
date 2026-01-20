@@ -4,13 +4,40 @@ from contextlib import contextmanager
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-DB_HOST = os.getenv("DB_HOST", "db")
-DB_PORT = int(os.getenv("DB_PORT", "5432"))
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
-DB_NAME = os.getenv("DB_NAME", "mydb")
+def _read_str_env(name: str, default: str) -> str:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    value = value.strip()
+    return value if value else default
 
+
+def _read_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    raw = raw.strip()
+    if not raw:
+        return default
+    return int(raw)
+
+
+DB_HOST = _read_str_env("DB_HOST", "db")
+DB_PORT = _read_int_env("DB_PORT", 5432)
+DB_USER = _read_str_env("DB_USER", "postgres")
+DB_PASSWORD = _read_str_env("DB_PASSWORD", "postgres")
+DB_NAME = _read_str_env("DB_NAME", "mydb")
+
+# Ensure users exists even if the DB volume was created without init.sql,
+# since scans references users(id).
 SCAN_SCHEMA_STATEMENTS = [
+    """
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL
+    )
+    """,
     """
     CREATE TABLE IF NOT EXISTS scans (
       id SERIAL PRIMARY KEY,
@@ -53,7 +80,8 @@ def get_db_connection():
         conn.close()
 
 
-def init_scan_schema(retries: int = 5, delay_seconds: float = 1.0) -> None:
+def init_scan_schema(retries: int = 30, delay_seconds: float = 2.0) -> None:
+    # Allow for slow DB startup/initialization in production deployments.
     for attempt in range(retries):
         try:
             with get_db_connection() as conn:

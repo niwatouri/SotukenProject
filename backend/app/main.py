@@ -12,7 +12,18 @@ from app.scan_utils import normalize_report, scan_type_from_scan_types
 from app.tasks import zap_scan_task
 from rq.job import Job
 
-SCAN_TIMEOUT_SECONDS = int(os.getenv("SCAN_TIMEOUT_SECONDS", "3600"))
+
+def _read_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    raw = raw.strip()
+    if not raw:
+        return default
+    return int(raw)
+
+
+SCAN_TIMEOUT_SECONDS = _read_int_env("SCAN_TIMEOUT_SECONDS", 3600)
 
 app = FastAPI()
 

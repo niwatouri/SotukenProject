@@ -1,295 +1,57 @@
 {
 	"@programName": "ZAP",
 	"@version": "2.17.0",
-	"@generated": "Tue, 6 Jan 2026 00:12:00",
-	"created": "2026-01-05T15:12:00.176745320Z",
+	"@generated": "Tue, 20 Jan 2026 09:57:14",
+	"created": "2026-01-20T00:57:14.944220357Z",
 	"insights":[
-		{
-			"level": "Low",
-			"reason": "Warning",
-			"site": "",
-			"key": "insight.log.error",
-			"description": "ZAP errors logged - see the zap.log file for details",
-			"statistic": "8"
-		},
 		{
 			"level": "Low",
 			"reason": "Warning",
 			"site": "",
 			"key": "insight.log.warn",
 			"description": "ZAP warnings logged - see the zap.log file for details",
-			"statistic": "25"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "",
-			"key": "insight.network.failure",
-			"description": "Percentage of network failures",
-			"statistic": "1"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.application/pdf",
-			"description": "Percentage of endpoints with content type application/pdf",
-			"statistic": "1"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.application/x-javascript",
-			"description": "Percentage of endpoints with content type application/x-javascript",
 			"statistic": "2"
 		},
 		{
 			"level": "Info",
 			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.application/xml",
-			"description": "Percentage of endpoints with content type application/xml",
-			"statistic": "1"
+			"site": "https://d3jwcz2kjx71xx.cloudfront.net",
+			"key": "insight.endpoint.ctype.application/javascript",
+			"description": "Percentage of endpoints with content type application/javascript",
+			"statistic": "50"
 		},
 		{
 			"level": "Info",
 			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.image/gif",
-			"description": "Percentage of endpoints with content type image/gif",
-			"statistic": "5"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.image/jpeg",
-			"description": "Percentage of endpoints with content type image/jpeg",
-			"statistic": "16"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.image/png",
-			"description": "Percentage of endpoints with content type image/png",
-			"statistic": "1"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.text/css",
-			"description": "Percentage of endpoints with content type text/css",
-			"statistic": "1"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
+			"site": "https://d3jwcz2kjx71xx.cloudfront.net",
 			"key": "insight.endpoint.ctype.text/html",
 			"description": "Percentage of endpoints with content type text/html",
-			"statistic": "49"
+			"statistic": "50"
 		},
 		{
 			"level": "Info",
 			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.text/plain",
-			"description": "Percentage of endpoints with content type text/plain",
-			"statistic": "12"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.ctype.text/xml",
-			"description": "Percentage of endpoints with content type text/xml",
-			"statistic": "8"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
+			"site": "https://d3jwcz2kjx71xx.cloudfront.net",
 			"key": "insight.endpoint.method.GET",
 			"description": "Percentage of endpoints with method GET",
-			"statistic": "86"
+			"statistic": "100"
 		},
 		{
 			"level": "Info",
 			"reason": "Informational",
-			"site": "http://www.badstore.net",
-			"key": "insight.endpoint.method.POST",
-			"description": "Percentage of endpoints with method POST",
-			"statistic": "13"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://www.badstore.net",
+			"site": "https://d3jwcz2kjx71xx.cloudfront.net",
 			"key": "insight.endpoint.total",
 			"description": "Count of total endpoints",
-			"statistic": "73"
+			"statistic": "6"
 		}
 	],
 	"site":[ 
 		{
-			"@name": "http://www.badstore.net",
-			"@host": "www.badstore.net",
-			"@port": "80",
-			"@ssl": "false",
+			"@name": "https://d3jwcz2kjx71xx.cloudfront.net",
+			"@host": "d3jwcz2kjx71xx.cloudfront.net",
+			"@port": "443",
+			"@ssl": "true",
 			"alerts": [ 
-				{
-					"pluginid": "40012",
-					"alertRef": "40012",
-					"alert": "Cross Site Scripting (Reflected)",
-					"name": "Cross Site Scripting (Reflected)",
-					"riskcode": "3",
-					"confidence": "2",
-					"riskdesc": "High (Medium)",
-					"desc": "<p>Cross-site Scripting (XSS) is an attack technique that involves echoing attacker-supplied code into a user's browser instance. A browser instance can be a standard web browser client, or a browser object embedded in a software product such as the browser within WinAmp, an RSS reader, or an email client. The code itself is usually written in HTML/JavaScript, but may also extend to VBScript, ActiveX, Java, Flash, or any other browser-supported technology.</p><p>When an attacker gets a user's browser to execute his/her code, the code will run within the security context (or zone) of the hosting web site. With this level of privilege, the code has the ability to read, modify and transmit any sensitive data accessible by the browser. A Cross-site Scripted user could have his/her account hijacked (cookie theft), their browser redirected to another location, or possibly shown fraudulent content delivered by the web site they are visiting. Cross-site Scripting attacks essentially compromise the trust relationship between a user and the web site. Applications utilizing browser object instances which load content from the file system may execute code under the local machine zone allowing for system compromise.</p><p></p><p>There are three types of Cross-site Scripting attacks: non-persistent, persistent and DOM-based.</p><p>Non-persistent attacks and DOM-based attacks require a user to either visit a specially crafted link laced with malicious code, or visit a malicious web page containing a web form, which when posted to the vulnerable site, will mount the attack. Using a malicious form will oftentimes take place when the vulnerable resource only accepts HTTP POST requests. In such a case, the form can be submitted automatically, without the victim's knowledge (e.g. by using JavaScript). Upon clicking on the malicious link or submitting the malicious form, the XSS payload will get echoed back and will get interpreted by the user's browser and execute. Another technique to send almost arbitrary requests (GET and POST) is by using an embedded client, such as Adobe Flash.</p><p>Persistent attacks occur when the malicious code is submitted to a web site where it's stored for a period of time. Examples of an attacker's favorite targets often include message board posts, web mail messages, and web chat software. The unsuspecting user is not required to interact with any additional site/link (e.g. an attacker site or a malicious link sent via email), just simply view the web page containing the code.</p>",
-					"instances":[ 
-						{
-							"id": "0",
-							"uri": "http://www.badstore.net/cgi-bin/badstore.cgi?action=moduser",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/badstore.cgi (action)(DoMods,email,pwdhint)",
-							"method": "POST",
-							"param": "email",
-							"attack": "</h2><scrIpt>alert(1);</scRipt><h2>",
-							"evidence": "</h2><scrIpt>alert(1);</scRipt><h2>",
-							"otherinfo": ""
-						}
-					],
-					"count": "1",
-					"systemic": false,
-					"solution": "<p>Phase: Architecture and Design</p><p>Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid.</p><p>Examples of libraries and frameworks that make it easier to generate properly encoded output include Microsoft's Anti-XSS library, the OWASP ESAPI Encoding module, and Apache Wicket.</p><p></p><p>Phases: Implementation; Architecture and Design</p><p>Understand the context in which your data will be used and the encoding that will be expected. This is especially important when transmitting data between different components, or when generating outputs that can contain multiple encodings at the same time, such as web pages or multi-part mail messages. Study all expected communication protocols and data representations to determine the required encoding strategies.</p><p>For any data that will be output to another web page, especially any data that was received from external inputs, use the appropriate encoding on all non-alphanumeric characters.</p><p>Consult the XSS Prevention Cheat Sheet for more details on the types of encoding and escaping that are needed.</p><p></p><p>Phase: Architecture and Design</p><p>For any security checks that are performed on the client side, ensure that these checks are duplicated on the server side, in order to avoid CWE-602. Attackers can bypass the client-side checks by modifying values after the checks have been performed, or by changing the client to remove the client-side checks entirely. Then, these modified values would be submitted to the server.</p><p></p><p>If available, use structured mechanisms that automatically enforce the separation between data and code. These mechanisms may be able to provide the relevant quoting, encoding, and validation automatically, instead of relying on the developer to provide this capability at every point where output is generated.</p><p></p><p>Phase: Implementation</p><p>For every web page that is generated, use and specify a character encoding such as ISO-8859-1 or UTF-8. When an encoding is not specified, the web browser may choose a different encoding by guessing which encoding is actually being used by the web page. This can cause the web browser to treat certain sequences as special, opening up the client to subtle XSS attacks. See CWE-116 for more mitigations related to encoding/escaping.</p><p></p><p>To help mitigate XSS attacks against the user's session cookie, set the session cookie to be HttpOnly. In browsers that support the HttpOnly feature (such as more recent versions of Internet Explorer and Firefox), this attribute can prevent the user's session cookie from being accessible to malicious client-side scripts that use document.cookie. This is not a complete solution, since HttpOnly is not supported by all browsers. More importantly, XMLHTTPRequest and other powerful browser technologies provide read access to HTTP headers, including the Set-Cookie header in which the HttpOnly flag is set.</p><p></p><p>Assume all input is malicious. Use an \"accept known good\" input validation strategy, i.e., use an allow list of acceptable inputs that strictly conform to specifications. Reject any input that does not strictly conform to specifications, or transform it into something that does. Do not rely exclusively on looking for malicious or malformed inputs (i.e., do not rely on a deny list). However, deny lists can be useful for detecting potential attacks or determining which inputs are so malformed that they should be rejected outright.</p><p></p><p>When performing input validation, consider all potentially relevant properties, including length, type of input, the full range of acceptable values, missing or extra inputs, syntax, consistency across related fields, and conformance to business rules. As an example of business rule logic, \"boat\" may be syntactically valid because it only contains alphanumeric characters, but it is not valid if you are expecting colors such as \"red\" or \"blue.\"</p><p></p><p>Ensure that you perform input validation at well-defined interfaces within the application. This will help protect the application even if a component is reused or moved elsewhere.</p><p>\t</p>",
-					"otherinfo": "",
-					"reference": "<p>https://owasp.org/www-community/attacks/xss/</p><p>https://cwe.mitre.org/data/definitions/79.html</p>",
-					"cweid": "79",
-					"wascid": "8",
-					"sourceid": "1067"
-				},
-				{
-					"pluginid": "40018",
-					"alertRef": "40018",
-					"alert": "SQL Injection",
-					"name": "SQL Injection",
-					"riskcode": "3",
-					"confidence": "1",
-					"riskdesc": "High (Low)",
-					"desc": "<p>SQL injection may be possible.</p>",
-					"instances":[ 
-						{
-							"id": "6",
-							"uri": "http://www.badstore.net/cgi-bin/soapsearch.cgi",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/soapsearch.cgi ()(<?xml version=\"\u0026apos;\" encoding=\"UTF-8\" ?>\r\n<s11:Envelope xmlns:s11='http:\/\/schemas.xmlsoap.org\/soap\/envelope\/'>\n  <s11:Body>\n    <ns1:SearchByName xmlns:ns1='http:\/\/www.badstore.net\/Search'>\n      <sName \/>\n    <\/ns1:SearchByName>\n  <\/s11:Body>\n<\/s11:Envelope>)",
-							"method": "POST",
-							"param": "version",
-							"attack": "'",
-							"evidence": "HTTP/1.1 500 Internal Server Error",
-							"otherinfo": ""
-						},
-						{
-							"id": "7",
-							"uri": "http://www.badstore.net/cgi-bin/soapsearch.cgi",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/soapsearch.cgi ()(<?xml version=\"\u0026apos;\" encoding=\"UTF-8\" ?>\r\n<s11:Envelope xmlns:s11='http:\/\/schemas.xmlsoap.org\/soap\/envelope\/'>\n  <s11:Body>\n    <ns1:SearchByNum xmlns:ns1='http:\/\/www.badstore.net\/Search'>\n      <sNum \/>\n    <\/ns1:SearchByNum>\n  <\/s11:Body>\n<\/s11:Envelope>)",
-							"method": "POST",
-							"param": "version",
-							"attack": "'",
-							"evidence": "HTTP/1.1 500 Internal Server Error",
-							"otherinfo": ""
-						},
-						{
-							"id": "8",
-							"uri": "http://www.badstore.net/cgi-bin/soapsearch.cgi",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/soapsearch.cgi ()(<?xml version=\"\u0026apos;\" encoding=\"UTF-8\" ?>\r\n<s11:Envelope xmlns:s11='http:\/\/schemas.xmlsoap.org\/soap\/envelope\/'>\n  <s11:Body>\n    <ns1:SearchByPrice xmlns:ns1='http:\/\/www.badstore.net\/Search'>\n      <sNum \/>\n    <\/ns1:SearchByPrice>\n  <\/s11:Body>\n<\/s11:Envelope>)",
-							"method": "POST",
-							"param": "version",
-							"attack": "'",
-							"evidence": "HTTP/1.1 500 Internal Server Error",
-							"otherinfo": ""
-						},
-						{
-							"id": "2",
-							"uri": "http://www.badstore.net/cgi-bin/badstore.cgi?action=login",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/badstore.cgi (action)(Login,email,passwd)",
-							"method": "POST",
-							"param": "email",
-							"attack": "zaproxy@example.com' AND '1'='1' -- ",
-							"evidence": "",
-							"otherinfo": "The page results were successfully manipulated using the boolean conditions [zaproxy@example.com' AND '1'='1' -- ] and [zaproxy@example.com' AND '1'='2' -- ]\nThe parameter value being modified was stripped from the HTML output for the purposes of the comparison.\nData was returned for the original parameter.\nThe vulnerability was detected by successfully restricting the data originally returned, by manipulating the parameter."
-						}
-					],
-					"count": "4",
-					"systemic": false,
-					"solution": "<p>Do not trust client side input, even if there is client side validation in place.</p><p>In general, type check all data on the server side.</p><p>If the application uses JDBC, use PreparedStatement or CallableStatement, with parameters passed by '?'</p><p>If the application uses ASP, use ADO Command Objects with strong type checking and parameterized queries.</p><p>If database Stored Procedures can be used, use them.</p><p>Do *not* concatenate strings into queries in the stored procedure, or use 'exec', 'exec immediate', or equivalent functionality!</p><p>Do not create dynamic SQL queries using simple string concatenation.</p><p>Escape all data received from the client.</p><p>Apply an 'allow list' of allowed characters, or a 'deny list' of disallowed characters in user input.</p><p>Apply the principle of least privilege by using the least privileged database user possible.</p><p>In particular, avoid using the 'sa' or 'db-owner' database users. This does not eliminate SQL injection, but minimizes its impact.</p><p>Grant the minimum database access that is necessary for the application.</p>",
-					"otherinfo": "",
-					"reference": "<p>https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html</p>",
-					"cweid": "89",
-					"wascid": "19",
-					"sourceid": "1790"
-				},
-				{
-					"pluginid": "40018",
-					"alertRef": "40018",
-					"alert": "SQL Injection - MySQL",
-					"name": "SQL Injection - MySQL",
-					"riskcode": "3",
-					"confidence": "2",
-					"riskdesc": "High (Medium)",
-					"desc": "<p>SQL injection may be possible.</p>",
-					"instances":[ 
-						{
-							"id": "1",
-							"uri": "http://www.badstore.net/cgi-bin/badstore.cgi?action=moduser",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/badstore.cgi (action)(DoMods,email,pwdhint)",
-							"method": "POST",
-							"param": "email",
-							"attack": "'",
-							"evidence": "You have an error in your SQL syntax",
-							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
-						},
-						{
-							"id": "3",
-							"uri": "http://www.badstore.net/cgi-bin/badstore.cgi?action=register",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/badstore.cgi (action)(Register,email,fullname,passwd,pwdhint,role)",
-							"method": "POST",
-							"param": "email",
-							"attack": "'",
-							"evidence": "You have an error in your SQL syntax",
-							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
-						},
-						{
-							"id": "4",
-							"uri": "http://www.badstore.net/cgi-bin/badstore.cgi?action=register",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/badstore.cgi (action)(Register,email,fullname,passwd,pwdhint,role)",
-							"method": "POST",
-							"param": "pwdhint",
-							"attack": "'",
-							"evidence": "You have an error in your SQL syntax",
-							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
-						},
-						{
-							"id": "5",
-							"uri": "http://www.badstore.net/cgi-bin/badstore.cgi?action=register",
-							"nodeName": "http:\/\/www.badstore.net\/cgi-bin\/badstore.cgi (action)(Register,email,fullname,passwd,pwdhint,role)",
-							"method": "POST",
-							"param": "role",
-							"attack": "'",
-							"evidence": "You have an error in your SQL syntax",
-							"otherinfo": "RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.\nThe vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised."
-						}
-					],
-					"count": "4",
-					"systemic": false,
-					"solution": "<p>Do not trust client side input, even if there is client side validation in place.</p><p>In general, type check all data on the server side.</p><p>If the application uses JDBC, use PreparedStatement or CallableStatement, with parameters passed by '?'</p><p>If the application uses ASP, use ADO Command Objects with strong type checking and parameterized queries.</p><p>If database Stored Procedures can be used, use them.</p><p>Do *not* concatenate strings into queries in the stored procedure, or use 'exec', 'exec immediate', or equivalent functionality!</p><p>Do not create dynamic SQL queries using simple string concatenation.</p><p>Escape all data received from the client.</p><p>Apply an 'allow list' of allowed characters, or a 'deny list' of disallowed characters in user input.</p><p>Apply the principle of least privilege by using the least privileged database user possible.</p><p>In particular, avoid using the 'sa' or 'db-owner' database users. This does not eliminate SQL injection, but minimizes its impact.</p><p>Grant the minimum database access that is necessary for the application.</p>",
-					"otherinfo": "<p>RDBMS [MySQL] likely, given error message regular expression [\\QYou have an error in your SQL syntax\\E] matched by the HTML results.</p><p>The vulnerability was detected by manipulating the parameter to cause a database error message to be returned and recognised.</p>",
-					"reference": "<p>https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html</p>",
-					"cweid": "89",
-					"wascid": "19",
-					"sourceid": "1557"
-				}
 			]
 		}
 	],
