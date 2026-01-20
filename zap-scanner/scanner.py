@@ -40,6 +40,22 @@ def _read_float_env(name, default):
     return float(raw)
 
 
+def _safe_scan_id(value):
+    if value is None:
+        return "noid"
+    text = str(value).strip()
+    if not text:
+        return "noid"
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", text)
+
+
+def _build_report_paths(scan_id):
+    safe_id = _safe_scan_id(scan_id)
+    timestamp = time.strftime("%Y%m%d%H%M%S")
+    base = f"/reports/zap_report_{safe_id}_{timestamp}"
+    return f"{base}.json", f"{base}.xml", f"{base}.html"
+
+
 ZAP_API_KEY = os.getenv('ZAP_API_KEY')
 ZAP_SCANNER_API_KEY = os.getenv('ZAP_SCANNER_API_KEY')
 ZAP_PROXY = 'http://127.0.0.1:8090'
@@ -968,8 +984,10 @@ def scan():
 
     report = report_payload if report_payload is not None else json.dumps({"site": []})
 
+    json_path, xml_path, html_path = _build_report_paths(scan_id)
+
     # JSONレポートをファイル保存（任意）
-    with open('/reports/zap_report.json', 'w') as f:
+    with open(json_path, 'w') as f:
         f.write(report)
 
     try:
@@ -978,7 +996,7 @@ def scan():
         xml_report = None
 
     if xml_report:
-        with open('/reports/zap_report.xml', 'w') as f:
+        with open(xml_path, 'w') as f:
             f.write(xml_report)
 
     try:
@@ -987,7 +1005,7 @@ def scan():
         html_report = None
 
     if html_report:
-        with open('/reports/zap_report.html', 'w') as f:
+        with open(html_path, 'w') as f:
             f.write(html_report)
 
     return jsonify({"message": "Scan complete", "report": report, "auth_status": auth_status})

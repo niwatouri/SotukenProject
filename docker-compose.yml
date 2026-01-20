@@ -161,7 +161,7 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL}
-      - REPORT_PATHS=/reports/zap_report.json,/reports/zap_report.xml,/reports/zap_report.html
+      - REPORT_PATHS=/reports/zap_report_*.json,/reports/zap_report_*.xml,/reports/zap_report_*.html
       - WAIT_TIMEOUT=${WAIT_TIMEOUT:-300}
       - POLL_INTERVAL=${POLL_INTERVAL:-5}
       - AI_JSON_PATH=/reports/ai_advice.json
