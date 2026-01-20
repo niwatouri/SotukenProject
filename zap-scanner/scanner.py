@@ -972,6 +972,24 @@ def scan():
     with open('/reports/zap_report.json', 'w') as f:
         f.write(report)
 
+    try:
+        xml_report = zap.core.xmlreport(apikey=ZAP_API_KEY)
+    except Exception:
+        xml_report = None
+
+    if xml_report:
+        with open('/reports/zap_report.xml', 'w') as f:
+            f.write(xml_report)
+
+    try:
+        html_report = zap.core.htmlreport(apikey=ZAP_API_KEY)
+    except Exception:
+        html_report = None
+
+    if html_report:
+        with open('/reports/zap_report.html', 'w') as f:
+            f.write(html_report)
+
     return jsonify({"message": "Scan complete", "report": report, "auth_status": auth_status})
 
 if __name__ == '__main__':

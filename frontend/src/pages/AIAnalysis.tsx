@@ -1,27 +1,164 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Brain, Shield, Home, Lightbulb, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
-import { useScan } from '../contexts/ScanContext';
+import { useScan, VulnerabilityData } from '../contexts/ScanContext';
 import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
+import { resolveBaseUrl } from '../utils/url';
+import { stripHtml } from '../utils/text';
+import type { Recommendation } from '../utils/analysis';
 import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
+
+interface AIAdviceItem {
+  vulnId: string;
+  title: string;
+  summary: string;
+  impact: string;
+  steps: string[];
+  analogy: string;
+}
+
+type AdviceRecommendation = Recommendation & {
+  steps?: string[];
+};
+
+const TOKEN_STORAGE_KEY = 'auth_token';
+const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, '/api');
+
+const getPriorityFromSeverity = (severity?: VulnerabilityData['severity']): 'high' | 'medium' | 'low' => {
+  switch (severity) {
+    case 'critical':
+    case 'high':
+      return 'high';
+    case 'medium':
+      return 'medium';
+    default:
+      return 'low';
+  }
+};
+
+const getFallbackAnalogy = (vulnType: string) => {
+  switch (vulnType) {
+    case 'SQL Injection':
+      return '家の鍵穴に針金を刺されて不正に開けられるようなもの。正しい鍵（パラメータ化クエリ）を使えば安全です。';
+    case 'XSS':
+      return '手紙に毒を仕込まれ、読んだ人が被害を受けるようなもの。手紙の内容をチェック（サニタイズ）すれば防げます。';
+    case 'Directory Traversal':
+      return '建物の立入禁止区域に不正侵入されるようなもの。適切な案内（パス検証）があれば防げます。';
+    case 'Open Port':
+    case 'Weak SSL/TLS':
+      return '家の窓や扉が開いたままになっているようなもの。不要な入口は閉めて、必要な入口には強い鍵をかけましょう。';
+    default:
+      return '小さな穴が空いたバケツのようなもの。放置すると被害が広がるため、早めに塞ぐのが効果的です。';
+  }
+};
 
 function AIAnalysis() {
   const { scanResults } = useScan();
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const [aiAdvice, setAiAdvice] = useState<AIAdviceItem[] | null>(null);
+  const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
 
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  if (!scanResults) {
+  useEffect(() => {
+    if (!scanResults) {
+      return;
+    }
+
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      setAiAdvice(null);
+      return;
+    }
+
+    const vulnerabilities = scanResults.vulnerabilities ?? [];
+    if (vulnerabilities.length === 0) {
+      setAiAdvice([]);
+      return;
+    }
+
+    let isActive = true;
+    const controller = new AbortController();
+
+    const fetchAdvice = async () => {
+      setIsLoadingAdvice(true);
+      setAiAdvice(null);
+      try {
+        const response = await fetch(`${API_BASE_URL}/advice`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ vulnerabilities }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`AI advice request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const items = Array.isArray(data?.items) ? data.items : null;
+        if (isActive && items) {
+          setAiAdvice(items as AIAdviceItem[]);
+        }
+      } catch (error) {
+        if (isActive) {
+          setAiAdvice(null);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingAdvice(false);
+        }
+      }
+    };
+
+    fetchAdvice();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [scanResults]);
+
+  const analysisData = scanResults ? getAnalysisData(scanResults) : null;
+  const vulnById = useMemo(() => {
+    const entries = scanResults?.vulnerabilities?.map((vuln) => [vuln.id, vuln] as const) ?? [];
+    return new Map(entries);
+  }, [scanResults]);
+  const adviceById = useMemo(() => {
+    const entries = (aiAdvice ?? [])
+      .filter((item) => item && typeof item.vulnId === 'string')
+      .map((item) => [item.vulnId, item] as const);
+    return new Map(entries);
+  }, [aiAdvice]);
+  const hasAiAdvice = !isLoadingAdvice && (aiAdvice?.length ?? 0) > 0;
+  const recommendations: AdviceRecommendation[] = hasAiAdvice
+    ? aiAdvice!.map((item) => {
+        const vuln = vulnById.get(item.vulnId);
+        const safeSteps = Array.isArray(item.steps)
+          ? item.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
+          : undefined;
+        return {
+          priority: getPriorityFromSeverity(vuln?.severity),
+          title: item.title || vuln?.type || '脆弱性の改善案',
+          description: stripHtml(item.summary || vuln?.description || ''),
+          impact: stripHtml(item.impact || vuln?.impact || ''),
+          steps: safeSteps,
+        };
+      })
+    : analysisData?.recommendations ?? [];
+
+  if (!scanResults || !analysisData) {
     navigate('/home');
     return null;
   }
-
-  const analysisData = getAnalysisData(scanResults);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
@@ -137,7 +274,7 @@ function AIAnalysis() {
           </div>
           
           <div className="space-y-6">
-            {analysisData.recommendations.map((rec, index) => (
+            {recommendations.map((rec, index) => (
               <div key={index} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-start space-x-4">
                   <div className={`w-3 h-3 rounded-full ${getPriorityColor(rec.priority)} mt-2`}></div>
@@ -149,6 +286,13 @@ function AIAnalysis() {
                       </span>
                     </div>
                     <p className="text-gray-700 mb-3">{rec.description}</p>
+                    {rec.steps && rec.steps.length > 0 && (
+                      <ul className="mb-3 list-disc list-inside text-sm text-gray-600 space-y-1">
+                        {rec.steps.map((step, stepIndex) => (
+                          <li key={stepIndex}>{step}</li>
+                        ))}
+                      </ul>
+                    )}
                     <div className="flex items-center space-x-2 text-sm text-green-600">
                       <CheckCircle className="w-4 h-4" />
                       <span className="font-medium">期待効果:</span>
@@ -166,7 +310,18 @@ function AIAnalysis() {
           <h3 className="text-2xl font-bold text-gray-900 mb-6">詳細分析と解説</h3>
           
           <div className="space-y-8">
-            {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => (
+            {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => {
+              const advice = adviceById.get(vuln.id);
+              const summary = stripHtml(advice?.summary || vuln.description);
+              const impact = stripHtml(advice?.impact || vuln.impact);
+              const steps = Array.isArray(advice?.steps)
+                ? advice?.steps
+                    .map((step) => stripHtml(step))
+                    .filter((step) => step.length > 0)
+                : [];
+              const analogyFromAi = stripHtml(advice?.analogy || '');
+              const analogy = analogyFromAi || getFallbackAnalogy(vuln.type);
+              return (
               <div key={vuln.id} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
                 <div className="flex items-center space-x-3 mb-4">
                   <span className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-semibold text-sm">
@@ -178,33 +333,33 @@ function AIAnalysis() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div>
                     <h5 className="font-semibold text-gray-900 mb-3">技術的解説</h5>
-                    <p className="text-gray-700 mb-4">{vuln.description}</p>
-                    <p className="text-gray-700"><strong>影響:</strong> {vuln.impact}</p>
+                    <p className="text-gray-700 mb-4">{summary}</p>
+                    <p className="text-gray-700"><strong>影響:</strong> {impact}</p>
                   </div>
                   
                   <div>
                     <h5 className="font-semibold text-gray-900 mb-3">改善案</h5>
-                    <p className="text-gray-700 mb-4">{vuln.solution}</p>
+                    {steps.length > 0 ? (
+                      <ul className="text-gray-700 mb-4 list-disc list-inside space-y-1">
+                        {steps.map((step, stepIndex) => (
+                          <li key={stepIndex}>{step}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-gray-700 mb-4">{stripHtml(vuln.solution)}</p>
+                    )}
                     
-                    {scanResults.scanType === 'bulk' && (
+                    {scanResults.scanType === 'bulk' && analogy && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <h6 className="font-medium text-blue-900 mb-2">💡 わかりやすい例え</h6>
-                        <p className="text-blue-800 text-sm">
-                          {vuln.type === 'SQL Injection' && 
-                            '家の鍵穴に針金を刺されて不正に開けられるようなもの。正しい鍵（パラメータ化クエリ）を使えば安全です。'}
-                          {vuln.type === 'XSS' && 
-                            '手紙に毒を仕込まれ、読んだ人が被害を受けるようなもの。手紙の内容をチェック（サニタイズ）すれば防げます。'}
-                          {vuln.type === 'Directory Traversal' && 
-                            '建物の立入禁止区域に不正侵入されるようなもの。適切な案内（パス検証）があれば防げます。'}
-                          {(vuln.type === 'Open Port' || vuln.type === 'Weak SSL/TLS') && 
-                            '家の窓や扉が開いたままになっているようなもの。不要な入口は閉めて、必要な入口には強い鍵をかけましょう。'}
-                        </p>
+                        <p className="text-blue-800 text-sm">{analogy}</p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           
           {scanResults.vulnerabilities.length > 3 && (

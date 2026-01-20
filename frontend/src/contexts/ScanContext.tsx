@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { resolveBaseUrl } from '../utils/url';
+import { stripHtml } from '../utils/text';
 
 export interface VulnerabilityData {
   id: string;
@@ -90,6 +91,18 @@ const isValidScanResults = (data: any): data is ScanResults => {
     typeof data.riskScore === 'number';
 };
 
+const sanitizeVulnerability = (vulnerability: VulnerabilityData): VulnerabilityData => ({
+  ...vulnerability,
+  description: stripHtml(vulnerability.description || ''),
+  impact: stripHtml(vulnerability.impact || ''),
+  solution: stripHtml(vulnerability.solution || ''),
+});
+
+const sanitizeScanResults = (results: ScanResults): ScanResults => ({
+  ...results,
+  vulnerabilities: results.vulnerabilities.map(sanitizeVulnerability),
+});
+
 export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -123,7 +136,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
       if (!isValidScanResults(parsed)) {
         return false;
       }
-      setScanResults(parsed);
+      setScanResults(sanitizeScanResults(parsed));
       return true;
     } catch {
       return false;
@@ -173,7 +186,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
       if (!isValidScanResults(parsed)) {
         return false;
       }
-      setScanResults(parsed);
+      setScanResults(sanitizeScanResults(parsed));
       return true;
     } catch {
       return false;
@@ -260,7 +273,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
             throw new Error('スキャン結果の形式が想定と異なります');
           }
           bumpProgress(100);
-          setScanResults(result);
+          setScanResults(sanitizeScanResults(result));
           return true;
         }
 

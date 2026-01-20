@@ -82,6 +82,7 @@ services:
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ZAP_SCANNER_API_KEY=${ZAP_SCANNER_API_KEY}
       - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS}
       - DB_HOST=${DB_HOST}
@@ -148,6 +149,28 @@ services:
       - ASCAN_DELAY_IN_MS=${ASCAN_DELAY_IN_MS}
     volumes:
       - ./reports:/reports
+    networks:
+      - zapnet
+
+  # AI解析
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    container_name: zap-ai
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - REPORT_PATHS=/reports/zap_report.json,/reports/zap_report.xml,/reports/zap_report.html
+      - WAIT_TIMEOUT=${WAIT_TIMEOUT:-300}
+      - POLL_INTERVAL=${POLL_INTERVAL:-5}
+      - AI_JSON_PATH=/reports/ai_advice.json
+      - AI_TXT_PATH=/reports/ai_advice.txt
+    volumes:
+      - ./reports:/reports
+    depends_on:
+      zap-scanner:
+        condition: service_started
     networks:
       - zapnet
 

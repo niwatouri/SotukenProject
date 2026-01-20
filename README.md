@@ -2,6 +2,7 @@
 vulnerability scanner
 
 ## Setup
+※ `OPENAI_API_KEY` は環境変数で設定（`.env` はローカル専用・リポジトリに含めない）。漏洩したキーは必ず再発行/ローテーションしてください。
 1) `.env` に `JWT_SECRET` を必ず設定（`login` と `backend` で共通。未設定/空は起動失敗、`dev-secret` フォールバックなし）  
    例: `openssl rand -hex 32`
 2) `ZAP_SCANNER_API_KEY` を設定（設定時は backend→zap-scanner のみ許可）
