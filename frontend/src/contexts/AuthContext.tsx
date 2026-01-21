@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { resolveBaseUrl } from '../utils/url';
 
 interface AuthContextType {
@@ -140,11 +140,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setIsAuthenticated(false);
     setUser(null);
-  };
+  }, [setIsAuthenticated, setUser]);
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, isAuthReady, user, login, signup, logout }}>

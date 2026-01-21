@@ -658,6 +658,11 @@ def _check_request_api_key():
     return True, None, None
 
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"}), 200
+
+
 @app.route('/scan', methods=['POST'])
 def scan():
     authorized, error_message, error_status = _check_request_api_key()

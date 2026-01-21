@@ -41,6 +41,32 @@ def _build_retry_backoff(timeout_seconds: int) -> list[int]:
 
 RETRY_BACKOFF_SECONDS = _build_retry_backoff(SCAN_TIMEOUT_SECONDS)
 
+def _post_scan_request(url, payload, headers):
+    last_response = None
+    last_exception = None
+    for wait_seconds in [0, *RETRY_BACKOFF_SECONDS]:
+        if wait_seconds:
+            time.sleep(wait_seconds)
+        try:
+            response = httpx.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=SCAN_TIMEOUT_SECONDS,
+            )
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            last_exception = exc
+            continue
+        last_response = response
+        if response.status_code == 429:
+            continue
+        return response
+    if last_response is not None and last_response.status_code == 429:
+        raise RuntimeError("ZAP scanner busy after retries")
+    if last_exception is not None:
+        raise last_exception
+    raise RuntimeError("ZAP scan failed before response")
+
 
 def _update_scan_status(
     scan_id,
@@ -100,40 +126,20 @@ def zap_scan_task(
         payload_scan_types = ["all"]
     try:
         headers = {"X-API-Key": ZAP_SCANNER_API_KEY} if ZAP_SCANNER_API_KEY else {}
+        payload = {
+            "url": url,
+            "scan_types": payload_scan_types,
+            "auth": auth,
+            "scan_id": scan_id,
+        }
         _update_scan_status(scan_id, user_id, "running", error=None, progress_percent=5)
-        response = httpx.post(
+        response = _post_scan_request(
             f"{ZAP_SCANNER_URL}/scan",
-            json={
-                "url": url,
-                "scan_types": payload_scan_types,
-                "auth": auth,
-                "scan_id": scan_id,
-            },
-            headers=headers,
-            timeout=SCAN_TIMEOUT_SECONDS,
+            payload,
+            headers,
         )
-        if response.status_code == 429:
-            for wait_seconds in RETRY_BACKOFF_SECONDS:
-                time.sleep(wait_seconds)
-                response = httpx.post(
-                    f"{ZAP_SCANNER_URL}/scan",
-                    json={
-                        "url": url,
-                        "scan_types": payload_scan_types,
-                        "auth": auth,
-                        "scan_id": scan_id,
-                    },
-                    headers=headers,
-                    timeout=SCAN_TIMEOUT_SECONDS,
-                )
-                if response.status_code != 429:
-                    break
         if response.status_code != 200:
-            error_message = (
-                "ZAP scanner busy after retries"
-                if response.status_code == 429
-                else f"ZAP scan failed with status {response.status_code}"
-            )
+            error_message = f"ZAP scan failed with status {response.status_code}"
             raise RuntimeError(error_message)
         data = response.json()
     except Exception as exc:

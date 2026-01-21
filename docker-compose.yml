@@ -76,7 +76,7 @@ services:
       db:
         condition: service_healthy
       zap-scanner:
-        condition: service_started
+        condition: service_healthy
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
@@ -102,6 +102,8 @@ services:
         condition: service_started
       redis:
         condition: service_started
+      zap-scanner:
+        condition: service_healthy
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
       - ZAP_SCANNER_API_KEY=${ZAP_SCANNER_API_KEY}
@@ -145,6 +147,12 @@ services:
       - ASCAN_MAX_RESULTS=${ASCAN_MAX_RESULTS}
       - ASCAN_THREADS_PER_HOST=${ASCAN_THREADS_PER_HOST}
       - ASCAN_DELAY_IN_MS=${ASCAN_DELAY_IN_MS}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5000/health >/dev/null || exit 1"]
+      interval: 90s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
     volumes:
       - ./reports:/reports
     networks:
@@ -168,7 +176,7 @@ services:
       - ./reports:/reports
     depends_on:
       zap-scanner:
-        condition: service_started
+        condition: service_healthy
     networks:
       - zapnet
 

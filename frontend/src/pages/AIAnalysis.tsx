@@ -98,6 +98,13 @@ function AIAnalysis() {
           signal: controller.signal,
         });
 
+        if (response.status === 401) {
+          if (isActive) {
+            logout();
+          }
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`AI advice request failed: ${response.status}`);
         }
@@ -124,7 +131,7 @@ function AIAnalysis() {
       isActive = false;
       controller.abort();
     };
-  }, [scanResults]);
+  }, [scanResults, logout]);
 
   const analysisData = scanResults ? getAnalysisData(scanResults) : null;
   const vulnById = useMemo(() => {

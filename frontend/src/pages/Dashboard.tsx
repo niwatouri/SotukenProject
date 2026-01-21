@@ -46,6 +46,21 @@ const getPriorityLabel = (priority: string) => {
   }
 };
 
+const getSeverityLabel = (severity: VulnerabilityData['severity'] | string) => {
+  switch (severity) {
+    case 'critical':
+      return '重大';
+    case 'high':
+      return '高';
+    case 'medium':
+      return '中';
+    case 'low':
+      return '低';
+    default:
+      return String(severity).toUpperCase();
+  }
+};
+
 const getFallbackAnalogy = (vulnType: string) => {
   switch (vulnType) {
     case 'SQL Injection':
@@ -314,13 +329,13 @@ function Dashboard() {
   }, {} as Record<string, number>);
 
   const chartData = Object.entries(severityCounts).map(([severity, count]) => ({
-    severity: severity.toUpperCase(),
+    severity: getSeverityLabel(severity),
     count,
     color: severityColors[severity as keyof typeof severityColors]
   }));
 
   const pieData = Object.entries(severityCounts).map(([severity, count]) => ({
-    name: severity.toUpperCase(),
+    name: getSeverityLabel(severity),
     value: count,
     color: severityColors[severity as keyof typeof severityColors]
   }));
@@ -595,7 +610,7 @@ function Dashboard() {
               <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl p-6 text-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-purple-100 text-sm">Medium以上のリスク</p>
+                    <p className="text-purple-100 text-sm">中以上のリスク</p>
                     <p className="text-3xl font-bold">
                       {scanResults.vulnerabilities.filter(v => ['medium', 'high', 'critical'].includes(v.severity)).length}
                     </p>
@@ -661,40 +676,61 @@ function Dashboard() {
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">検出された脆弱性</h3>
               <div className="space-y-4">
-                {scanResults.vulnerabilities.map(vuln => (
-                  <div key={vuln.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <h4 className="text-lg font-semibold text-gray-900">{vuln.type}</h4>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium text-white`}
-                          style={{ backgroundColor: severityColors[vuln.severity] }}
-                        >
-                          {vuln.severity.toUpperCase()}
-                        </span>
-                        {vuln.cveId && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
-                            {vuln.cveId}
+                {scanResults.vulnerabilities.map((vuln) => {
+                  const advice = adviceById.get(vuln.id);
+                  const title = advice?.title
+                    ? stripHtml(advice.title)
+                    : hasAiAdvice
+                      ? '脆弱性項目'
+                      : 'AI解析中';
+                  const description = hasAiAdvice
+                    ? (advice?.summary ? stripHtml(advice.summary) : aiMissingSummaryText)
+                    : aiPlaceholderText;
+                  const impact = hasAiAdvice
+                    ? (advice?.impact ? stripHtml(advice.impact) : aiMissingImpactText)
+                    : aiPlaceholderText;
+                  const steps = hasAiAdvice && Array.isArray(advice?.steps)
+                    ? advice.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
+                    : [];
+                  const solutionText = hasAiAdvice
+                    ? (steps.length > 0 ? steps.join(' / ') : aiMissingStepsText)
+                    : aiPlaceholderText;
+
+                  return (
+                    <div key={vuln.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <h4 className="text-lg font-semibold text-gray-900">{title}</h4>
+                          <span
+                            className="px-2 py-1 rounded-full text-xs font-medium text-white"
+                            style={{ backgroundColor: severityColors[vuln.severity] }}
+                          >
+                            {getSeverityLabel(vuln.severity)}
                           </span>
-                        )}
+                          {vuln.cveId && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
+                              {vuln.cveId}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm text-gray-600">ポート {vuln.port}</span>
                       </div>
-                      <span className="text-sm text-gray-600">ポート {vuln.port}</span>
+
+                      <p className="text-gray-700 mb-3">{description}</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="font-medium text-gray-900 mb-1">影響:</p>
+                          <p className="text-gray-600">{impact}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 mb-1">対策:</p>
+                          <p className="text-gray-600">{solutionText}</p>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <p className="text-gray-700 mb-3">{vuln.description}</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="font-medium text-gray-900 mb-1">影響:</p>
-                        <p className="text-gray-600">{vuln.impact}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 mb-1">対策:</p>
-                        <p className="text-gray-600">{vuln.solution}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

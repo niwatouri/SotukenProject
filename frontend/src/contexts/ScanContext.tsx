@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { stripHtml } from '../utils/text';
+import { useAuth } from './AuthContext';
 
 export interface VulnerabilityData {
   id: string;
@@ -106,12 +107,19 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
+  const { logout } = useAuth();
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
   const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
+  const handleUnauthorized = useCallback((message?: string) => {
+    logout();
+    if (message) {
+      alert(message);
+    }
+  }, [logout]);
 
   const restoreLatestScan = useCallback(async (): Promise<boolean> => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -124,6 +132,10 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
           ...getAuthHeaders(),
         },
       });
+      if (response.status === 401) {
+        handleUnauthorized();
+        return false;
+      }
       if (response.status === 404) {
         return false;
       }
@@ -140,7 +152,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return false;
     }
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, handleUnauthorized]);
 
   const loadScanHistory = useCallback(async (): Promise<ScanHistoryItem[]> => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -153,6 +165,10 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
           ...getAuthHeaders(),
         },
       });
+      if (response.status === 401) {
+        handleUnauthorized();
+        return [];
+      }
       if (!response.ok) {
         return [];
       }
@@ -164,7 +180,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return [];
     }
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, handleUnauthorized]);
 
   const loadScanById = useCallback(async (scanId: number): Promise<boolean> => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -177,6 +193,10 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
           ...getAuthHeaders(),
         },
       });
+      if (response.status === 401) {
+        handleUnauthorized();
+        return false;
+      }
       if (!response.ok) {
         return false;
       }
@@ -190,7 +210,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return false;
     }
-  }, [getAuthHeaders]);
+  }, [getAuthHeaders, handleUnauthorized]);
 
   const startScan = async (
     url: string,
@@ -218,6 +238,10 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
+      if (response.status === 401) {
+        handleUnauthorized('セッションが期限切れました。再ログインしてください。');
+        return false;
+      }
       if (!response.ok) {
         throw new Error(`ジョブ投入に失敗しました: ${response.statusText}`);
       }
@@ -245,6 +269,10 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
             ...getAuthHeaders(),
           },
         });
+        if (resultRes.status === 401) {
+          handleUnauthorized('セッションが期限切れました。再ログインしてください。');
+          return false;
+        }
         if (!resultRes.ok) {
           throw new Error(`結果取得失敗: ${resultRes.statusText}`);
         }
