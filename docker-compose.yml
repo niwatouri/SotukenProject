@@ -56,8 +56,6 @@ services:
     container_name: frontend
     ports:
       - "80:80" # または 3000:80 に変更可能
-    environment:
-      - VITE_API_URL=http://backend:8000
     depends_on:
       - backend
     volumes:

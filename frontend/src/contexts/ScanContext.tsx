@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { resolveBaseUrl } from '../utils/url';
 import { stripHtml } from '../utils/text';
 
 export interface VulnerabilityData {
@@ -79,7 +78,7 @@ interface ScanContextType {
 
 const ScanContext = createContext<ScanContextType | undefined>(undefined);
 const TOKEN_STORAGE_KEY = 'auth_token';
-const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, '/api');
+const API_BASE_URL = '/api';
 
 const isValidScanResults = (data: any): data is ScanResults => {
   return !!data &&

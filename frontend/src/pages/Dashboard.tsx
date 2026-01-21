@@ -2,11 +2,65 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Shield, AlertTriangle, Activity, Globe, Download, Brain, Home, Clock, Target, BarChart3, CheckCircle, Lightbulb } from 'lucide-react';
-import { ScanHistoryItem, useScan } from '../contexts/ScanContext';
+import { ScanHistoryItem, useScan, VulnerabilityData } from '../contexts/ScanContext';
 import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
+import { stripHtml } from '../utils/text';
 import { useAuth } from '../contexts/AuthContext';
 import { jsPDF } from 'jspdf';
 import Footer from '../components/Footer';
+
+interface AIAdviceItem {
+  vulnId: string;
+  title: string;
+  summary: string;
+  impact: string;
+  steps: string[];
+  analogy: string;
+}
+
+const TOKEN_STORAGE_KEY = 'auth_token';
+const API_BASE_URL = '/api';
+
+const getPriorityFromSeverity = (severity?: VulnerabilityData['severity']): 'high' | 'medium' | 'low' => {
+  switch (severity) {
+    case 'critical':
+    case 'high':
+      return 'high';
+    case 'medium':
+      return 'medium';
+    default:
+      return 'low';
+  }
+};
+
+const getPriorityLabel = (priority: string) => {
+  switch (priority) {
+    case 'high':
+      return '高';
+    case 'medium':
+      return '中';
+    case 'low':
+      return '低';
+    default:
+      return priority.toUpperCase();
+  }
+};
+
+const getFallbackAnalogy = (vulnType: string) => {
+  switch (vulnType) {
+    case 'SQL Injection':
+      return '家の鍵穴に針金を刺されて不正に開けられるようなもの。正しい鍵（パラメータ化クエリ）を使えば安全です。';
+    case 'XSS':
+      return '手紙に毒を仕込まれ、読んだ人が被害を受けるようなもの。手紙の内容をチェック（サニタイズ）すれば防げます。';
+    case 'Directory Traversal':
+      return '建物の立入禁止区域に不正侵入されるようなもの。適切な案内（パス検証）があれば防げます。';
+    case 'Open Port':
+    case 'Weak SSL/TLS':
+      return '家の窓や扉が開いたままになっているようなもの。不要な入口は閉めて、必要な入口には強い鍵をかけましょう。';
+    default:
+      return '';
+  }
+};
 
 function Dashboard() {
   const { scanResults, loadScanById, loadScanHistory } = useScan();
@@ -17,6 +71,8 @@ function Dashboard() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [loadingScanId, setLoadingScanId] = useState<number | null>(null);
+  const [aiAdvice, setAiAdvice] = useState<AIAdviceItem[] | null>(null);
+  const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
 
   // Scroll to top when component mounts or view changes
   useEffect(() => {
@@ -54,6 +110,75 @@ function Dashboard() {
       isActive = false;
     };
   }, [scanResults, loadScanHistory]);
+
+  useEffect(() => {
+    if (!scanResults) {
+      return;
+    }
+
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      setAiAdvice(null);
+      return;
+    }
+
+    const vulnerabilities = scanResults.vulnerabilities ?? [];
+    if (vulnerabilities.length === 0) {
+      setAiAdvice([]);
+      return;
+    }
+
+    let isActive = true;
+    const controller = new AbortController();
+
+    const fetchAdvice = async () => {
+      setIsLoadingAdvice(true);
+      setAiAdvice(null);
+      try {
+        const response = await fetch(`${API_BASE_URL}/advice`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ vulnerabilities }),
+          signal: controller.signal,
+        });
+
+        if (response.status === 401) {
+          if (isActive) {
+            logout();
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`AI advice request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const items = Array.isArray(data?.items) ? data.items : null;
+        if (isActive && items) {
+          setAiAdvice(items as AIAdviceItem[]);
+        }
+      } catch {
+        if (isActive) {
+          setAiAdvice(null);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingAdvice(false);
+        }
+      }
+    };
+
+    fetchAdvice();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [scanResults, logout]);
 
   const handleLoadScan = async (scanId: number) => {
     setLoadingScanId(scanId);
@@ -247,6 +372,58 @@ function Dashboard() {
   };
 
   const analysisData = getAnalysisData(scanResults);
+  const hasAiAdvice = !isLoadingAdvice && (aiAdvice?.length ?? 0) > 0;
+  const aiContentState = hasAiAdvice ? 'ready' : (isLoadingAdvice ? 'loading' : 'fallback');
+  const aiPlaceholderText = aiContentState === 'loading'
+    ? 'AI解析中です。しばらくお待ちください。'
+    : 'AI解析結果を取得できませんでした。';
+  const aiMissingSummaryText = 'AI解析の要約がありません。';
+  const aiMissingImpactText = 'AI解析の影響情報がありません。';
+  const aiMissingStepsText = 'AI解析の改善案がありません。';
+  const overallRiskLabel = analysisData.overallRisk === 'high'
+    ? '高'
+    : analysisData.overallRisk === 'medium'
+      ? '中'
+      : '低';
+  const vulnById = new Map(scanResults.vulnerabilities.map((vuln) => [vuln.id, vuln]));
+  const adviceById = new Map(
+    (aiAdvice ?? [])
+      .filter((item) => item && typeof item.vulnId === 'string')
+      .map((item) => [item.vulnId, item] as const),
+  );
+  const recommendations = hasAiAdvice
+    ? aiAdvice!.map((item) => {
+        const vuln = vulnById.get(item.vulnId);
+        const description = item.summary
+          ? stripHtml(item.summary)
+          : aiMissingSummaryText;
+        const impact = item.impact
+          ? stripHtml(item.impact)
+          : aiMissingImpactText;
+        const title = item.title ? stripHtml(item.title) : '脆弱性の改善案';
+        return {
+          priority: getPriorityFromSeverity(vuln?.severity),
+          title,
+          description,
+          impact,
+        };
+      })
+    : analysisData.recommendations;
+  const mostCritical = analysisData.mostCritical;
+  const mostCriticalAdvice = mostCritical ? adviceById.get(mostCritical.id) : undefined;
+  const mostCriticalTitle = mostCritical
+    ? (mostCriticalAdvice?.title ? stripHtml(mostCriticalAdvice.title) : hasAiAdvice ? '脆弱性項目' : 'AI解析中')
+    : '';
+  const mostCriticalSummary = mostCritical
+    ? (hasAiAdvice
+        ? (mostCriticalAdvice?.summary ? stripHtml(mostCriticalAdvice.summary) : aiMissingSummaryText)
+        : aiPlaceholderText)
+    : '';
+  const mostCriticalImpact = mostCritical
+    ? (hasAiAdvice
+        ? (mostCriticalAdvice?.impact ? stripHtml(mostCriticalAdvice.impact) : aiMissingImpactText)
+        : '')
+    : '';
 
   const authStatus = scanResults.authStatus;
   const authStatusLabel = authStatus?.success === true
@@ -558,13 +735,13 @@ function Dashboard() {
                   <div>
                     <h4 className="text-lg font-semibold mb-2">総合リスクレベル</h4>
                     <p className="text-sm">
-                      {analysisData.overallRisk === 'high' && 'immediate attention required - 緊急対応が必要です'}
-                      {analysisData.overallRisk === 'medium' && 'moderate risk - 早期対応を推奨します'}
-                      {analysisData.overallRisk === 'low' && 'low risk - 継続的な監視が必要です'}
+                      {analysisData.overallRisk === 'high' && '緊急対応が必要です'}
+                      {analysisData.overallRisk === 'medium' && '早期対応を推奨します'}
+                      {analysisData.overallRisk === 'low' && '継続的な監視が必要です'}
                     </p>
                   </div>
                   <div className="text-2xl font-bold uppercase">
-                    {analysisData.overallRisk}
+                    {overallRiskLabel}
                   </div>
                 </div>
               </div>
@@ -573,8 +750,11 @@ function Dashboard() {
                 <div className="border-l-4 border-red-500 bg-red-50 p-6 rounded-r-lg">
                   <h4 className="text-lg font-semibold text-red-900 mb-2">最優先対応項目</h4>
                   <div className="text-red-800">
-                    <p className="font-medium">{analysisData.mostCritical.type}</p>
-                    <p className="text-sm mt-1">{analysisData.mostCritical.description}</p>
+                    <p className="font-medium">{mostCriticalTitle}</p>
+                    <p className="text-sm mt-1">{mostCriticalSummary}</p>
+                    {mostCriticalImpact && (
+                      <p className="text-sm mt-2"><strong>影響:</strong> {mostCriticalImpact}</p>
+                    )}
                     <div className="mt-3 flex items-center space-x-2">
                       <AlertTriangle className="w-4 h-4" />
                       <span className="text-sm font-medium">ポート {analysisData.mostCritical.port} で検出</span>
@@ -592,7 +772,7 @@ function Dashboard() {
               </div>
               
               <div className="space-y-6">
-                {analysisData.recommendations.map((rec, index) => (
+                {recommendations.map((rec, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                     <div className="flex items-start space-x-4">
                       <div className={`w-3 h-3 rounded-full ${getPriorityColor(rec.priority)} mt-2`}></div>
@@ -600,7 +780,7 @@ function Dashboard() {
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-lg font-semibold text-gray-900">{rec.title}</h4>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getPriorityColor(rec.priority)}`}>
-                            {rec.priority.toUpperCase()}
+                            {getPriorityLabel(rec.priority)}
                           </span>
                         </div>
                         <p className="text-gray-700 mb-3">{rec.description}</p>
@@ -621,45 +801,68 @@ function Dashboard() {
               <h3 className="text-2xl font-bold text-gray-900 mb-6">詳細分析と解説</h3>
               
               <div className="space-y-8">
-                {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => (
-                  <div key={vuln.id} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
+                {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => {
+                  const advice = adviceById.get(vuln.id);
+                  const title = advice?.title
+                    ? stripHtml(advice.title)
+                    : hasAiAdvice
+                      ? '脆弱性項目'
+                      : 'AI解析中';
+                  const summary = hasAiAdvice
+                    ? (advice?.summary ? stripHtml(advice.summary) : aiMissingSummaryText)
+                    : aiPlaceholderText;
+                  const impact = hasAiAdvice
+                    ? (advice?.impact ? stripHtml(advice.impact) : aiMissingImpactText)
+                    : aiPlaceholderText;
+                  const steps = hasAiAdvice && Array.isArray(advice?.steps)
+                    ? advice.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
+                    : [];
+                  const analogyFromAi = hasAiAdvice && advice?.analogy ? stripHtml(advice.analogy) : '';
+                  const analogy = hasAiAdvice ? (analogyFromAi || getFallbackAnalogy(vuln.type)) : '';
+
+                  return (
+                    <div key={vuln.id} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
                     <div className="flex items-center space-x-3 mb-4">
                       <span className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-semibold text-sm">
                         {index + 1}
                       </span>
-                      <h4 className="text-xl font-semibold text-gray-900">{vuln.type}</h4>
+                      <h4 className="text-xl font-semibold text-gray-900">{title}</h4>
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <div>
                         <h5 className="font-semibold text-gray-900 mb-3">技術的解説</h5>
-                        <p className="text-gray-700 mb-4">{vuln.description}</p>
-                        <p className="text-gray-700"><strong>影響:</strong> {vuln.impact}</p>
+                        <p className="text-gray-700 mb-4">{summary}</p>
+                        <p className="text-gray-700"><strong>影響:</strong> {impact}</p>
                       </div>
                       
                       <div>
                         <h5 className="font-semibold text-gray-900 mb-3">改善案</h5>
-                        <p className="text-gray-700 mb-4">{vuln.solution}</p>
+                        {steps.length > 0 ? (
+                          <ul className="text-gray-700 mb-4 list-disc list-inside space-y-1">
+                            {steps.map((step, stepIndex) => (
+                              <li key={stepIndex}>{step}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-gray-700 mb-4">
+                            {hasAiAdvice ? aiMissingStepsText : aiPlaceholderText}
+                          </p>
+                        )}
                         
-                        {scanResults.scanType === 'bulk' && (
+                        {scanResults.scanType === 'bulk' && analogy && (
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <h6 className="font-medium text-blue-900 mb-2">💡 わかりやすい例え</h6>
                             <p className="text-blue-800 text-sm">
-                              {vuln.type === 'SQL Injection' && 
-                                '家の鍵穴に針金を刺されて不正に開けられるようなもの。正しい鍵（パラメータ化クエリ）を使えば安全です。'}
-                              {vuln.type === 'XSS' && 
-                                '手紙に毒を仕込まれ、読んだ人が被害を受けるようなもの。手紙の内容をチェック（サニタイズ）すれば防げます。'}
-                              {vuln.type === 'Directory Traversal' && 
-                                '建物の立入禁止区域に不正侵入されるようなもの。適切な案内（パス検証）があれば防げます。'}
-                              {(vuln.type === 'Open Port' || vuln.type === 'Weak SSL/TLS') && 
-                                '家の窓や扉が開いたままになっているようなもの。不要な入口は閉めて、必要な入口には強い鍵をかけましょう。'}
+                              {analogy}
                             </p>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

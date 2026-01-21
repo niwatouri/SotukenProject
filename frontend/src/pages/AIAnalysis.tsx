@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Brain, Shield, Home, Lightbulb, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { useScan, VulnerabilityData } from '../contexts/ScanContext';
 import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
-import { resolveBaseUrl } from '../utils/url';
 import { stripHtml } from '../utils/text';
 import type { Recommendation } from '../utils/analysis';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,7 +22,7 @@ type AdviceRecommendation = Recommendation & {
 };
 
 const TOKEN_STORAGE_KEY = 'auth_token';
-const API_BASE_URL = resolveBaseUrl(import.meta.env.VITE_API_URL, '/api');
+const API_BASE_URL = '/api';
 
 const getPriorityFromSeverity = (severity?: VulnerabilityData['severity']): 'high' | 'medium' | 'low' => {
   switch (severity) {
