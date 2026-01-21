@@ -34,6 +34,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       DB_HOST: db
       DB_USER: postgres
@@ -70,6 +72,8 @@ services:
     container_name: backend
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     volumes:
       - ./reports:/reports
     depends_on:

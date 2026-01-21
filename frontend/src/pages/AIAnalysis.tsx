@@ -7,6 +7,7 @@ import { stripHtml } from '../utils/text';
 import type { Recommendation } from '../utils/analysis';
 import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
+import { API_BASE_URL } from '../utils/api';
 
 interface AIAdviceItem {
   vulnId: string;
@@ -22,7 +23,6 @@ type AdviceRecommendation = Recommendation & {
 };
 
 const TOKEN_STORAGE_KEY = 'auth_token';
-const API_BASE_URL = '/api';
 
 const getPriorityFromSeverity = (severity?: VulnerabilityData['severity']): 'high' | 'medium' | 'low' => {
   switch (severity) {
