@@ -1,32 +1,8 @@
-import os
 import time
 from contextlib import contextmanager
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
-def _read_str_env(name: str, default: str) -> str:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    value = value.strip()
-    return value if value else default
-
-
-def _read_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    raw = raw.strip()
-    if not raw:
-        return default
-    return int(raw)
-
-
-DB_HOST = _read_str_env("DB_HOST", "db")
-DB_PORT = _read_int_env("DB_PORT", 5432)
-DB_USER = _read_str_env("DB_USER", "postgres")
-DB_PASSWORD = _read_str_env("DB_PASSWORD", "postgres")
-DB_NAME = _read_str_env("DB_NAME", "mydb")
+from app.config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
 
 # Ensure users exists even if the DB volume was created without init.sql,
 # since scans references users(id).

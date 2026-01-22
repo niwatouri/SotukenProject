@@ -1,26 +1,16 @@
 # backend/app/tasks.py
 import httpx
-import os
 import time
 from psycopg2.extras import Json
+
+from app.config import (
+    SCAN_TIMEOUT_SECONDS,
+    ZAP_SCANNER_API_KEY,
+    ZAP_SCANNER_URL,
+)
 from app.db import get_db_connection
 from app.report_parser import parse_zap_report
 from app.scan_utils import normalize_report, normalize_scan_types, scan_type_from_scan_types
-
-
-def _read_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    raw = raw.strip()
-    if not raw:
-        return default
-    return int(raw)
-
-
-ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
-ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
-SCAN_TIMEOUT_SECONDS = _read_int_env("SCAN_TIMEOUT_SECONDS", 3600)
 
 
 def _build_retry_backoff(total_wait_seconds: int) -> list[int]:

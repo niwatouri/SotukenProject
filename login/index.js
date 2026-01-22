@@ -3,18 +3,11 @@ import pool from './db.js';
 import bcrypt from 'bcrypt';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET, JWT_EXPIRES_IN } from './config.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-const rawJwtSecret = process.env.JWT_SECRET;
-if (!rawJwtSecret || rawJwtSecret.trim() === '') {
-  console.error('JWT_SECRET is required and must be non-empty.');
-  process.exit(1);
-}
-const JWT_SECRET = rawJwtSecret;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 
 const issueToken = (user) =>
   jwt.sign(

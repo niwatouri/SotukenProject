@@ -18,7 +18,7 @@ RUN python3 -m venv venv && \
     ./venv/bin/pip install --upgrade pip && \
     ./venv/bin/pip install --no-cache-dir -r requirements.txt
 
-COPY scanner.py entrypoint.sh ./
+COPY scanner.py config.py entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
 EXPOSE 8090 5000

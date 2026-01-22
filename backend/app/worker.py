@@ -9,11 +9,10 @@ if BASE_DIR not in sys.path:
 
 from redis import Redis
 from rq import Worker, Queue, Connection
+from app.config import REDIS_HOST, REDIS_PORT
 from app.db import init_scan_schema
 
 listen = ['default']
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
 
 if __name__ == '__main__':

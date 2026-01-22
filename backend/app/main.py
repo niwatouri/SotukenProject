@@ -1,31 +1,28 @@
+import json
+from typing import Any, Dict, Optional
+
+import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from redis import Redis
-from rq import Queue
-import json
-import os
-from typing import Any, Dict, Optional
-import jwt
 from openai import OpenAI
 from psycopg2.extras import Json
+from redis import Redis
+from rq import Queue
+from rq.job import Job
+
+from app.config import (
+    JWT_SECRET,
+    OPENAI_API_KEY,
+    OPENAI_MODEL,
+    REDIS_HOST,
+    REDIS_PORT,
+    SCAN_TIMEOUT_SECONDS,
+    ZAP_SCANNER_API_KEY,
+)
 from app.db import get_db_connection, init_scan_schema
 from app.report_parser import parse_zap_report
 from app.scan_utils import normalize_report, scan_type_from_scan_types
 from app.tasks import zap_scan_task
-from rq.job import Job
-
-
-def _read_int_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    raw = raw.strip()
-    if not raw:
-        return default
-    return int(raw)
-
-
-SCAN_TIMEOUT_SECONDS = _read_int_env("SCAN_TIMEOUT_SECONDS", 3600)
 
 app = FastAPI()
 
@@ -37,8 +34,6 @@ def _init_schema() -> None:
     init_scan_schema()
 
 # Redis接続
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
 # 長時間スキャンに耐えるよう、デフォルトタイムアウトを伸ばしてキューを作成
 q = Queue(connection=redis_conn, default_timeout=SCAN_TIMEOUT_SECONDS)
@@ -52,11 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
-JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = "gpt-4o-mini"
 
 
 def _extract_token(request: Request) -> Optional[str]:
