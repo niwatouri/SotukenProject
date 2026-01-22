@@ -35,6 +35,11 @@ export DB_PORT="5432"
 - 例: 最大5件まで同時処理したい場合
   `docker compose up --build --scale zap-scanner=5 --scale worker=5`
 - 1インスタンスに複数リクエストが来た場合は `429 (scanner busy)` を返します
+- 高負荷時は `zap-scanner` と `worker` を同じ数でスケールしてください
+
+## Timeouts
+- `SCAN_TIMEOUT_SECONDS` は backend/worker のジョブタイムアウトとスキャナー呼び出しの上限です（`.env` で設定）
+- `SCAN_TIMEOUT_SECONDS` は `SPIDER_MAX_DURATION_MINUTES` / `ASCAN_MAX_DURATION_MINUTES` と整合させてください
 
 ## Auth / API
 - `POST /register` / `POST /login` は `{ token, user: { userId, email } }` を返します

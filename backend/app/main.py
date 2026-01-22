@@ -454,7 +454,7 @@ async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_au
     scan_id = _create_scan_record(user_id, url, scan_types, "queued")
 
     try:
-        # 600秒タイムアウトのhttpx呼び出しより余裕を持たせてジョブタイムアウトを設定
+        # httpx タイムアウト (SCAN_TIMEOUT_SECONDS) に合わせてジョブタイムアウトを設定
         job = q.enqueue(
             zap_scan_task,
             scan_id,

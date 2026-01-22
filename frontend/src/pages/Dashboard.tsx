@@ -676,7 +676,7 @@ function Dashboard() {
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">検出された脆弱性</h3>
               <div className="space-y-4">
-                {scanResults.vulnerabilities.map((vuln) => {
+                {scanResults.vulnerabilities.map((vuln, index) => {
                   const advice = adviceById.get(vuln.id);
                   const title = advice?.title
                     ? stripHtml(advice.title)
@@ -697,7 +697,7 @@ function Dashboard() {
                     : aiPlaceholderText;
 
                   return (
-                    <div key={vuln.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div key={`${vuln.id}-${index}`} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center space-x-3">
                           <h4 className="text-lg font-semibold text-gray-900">{title}</h4>
@@ -857,7 +857,7 @@ function Dashboard() {
                   const analogy = hasAiAdvice ? (analogyFromAi || getFallbackAnalogy(vuln.type)) : '';
 
                   return (
-                    <div key={vuln.id} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
+                    <div key={`${vuln.id}-${index}`} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
                     <div className="flex items-center space-x-3 mb-4">
                       <span className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-semibold text-sm">
                         {index + 1}

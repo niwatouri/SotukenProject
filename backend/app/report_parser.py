@@ -60,7 +60,7 @@ def parse_zap_report(raw_json: Dict[str, Any], default_scan_type: str = "bulk", 
     open_ports: set[int] = set()
     target_url = default_target_url or ""
 
-    for site in sites:
+    for site_index, site in enumerate(sites):
         site_name = site.get("@name") or site.get("name")
         site_port_raw = site.get("@port") or site.get("port")
         site_port = None
@@ -75,7 +75,7 @@ def parse_zap_report(raw_json: Dict[str, Any], default_scan_type: str = "bulk", 
         alerts = site.get("alerts") or []
         for idx, alert in enumerate(alerts):
             plugin_id = str(alert.get("pluginid") or alert.get("id") or "unknown")
-            vuln_id = f"{plugin_id}-{idx}"
+            vuln_id = f"{plugin_id}-{site_index}-{idx}"
 
             severity = _map_severity(alert.get("riskcode"))
             description = alert.get("description") or alert.get("desc") or ""

@@ -328,7 +328,7 @@ function AIAnalysis() {
               const analogyFromAi = stripHtml(advice?.analogy || '');
               const analogy = analogyFromAi || getFallbackAnalogy(vuln.type);
               return (
-              <div key={vuln.id} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
+              <div key={`${vuln.id}-${index}`} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
                 <div className="flex items-center space-x-3 mb-4">
                   <span className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-semibold text-sm">
                     {index + 1}

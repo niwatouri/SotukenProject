@@ -23,9 +23,9 @@ ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
 SCAN_TIMEOUT_SECONDS = _read_int_env("SCAN_TIMEOUT_SECONDS", 3600)
 
 
-def _build_retry_backoff(timeout_seconds: int) -> list[int]:
-    # Stretch retries so total wait is close to the scan timeout.
-    target_total = max(2, int(timeout_seconds * 0.9))
+def _build_retry_backoff(total_wait_seconds: int) -> list[int]:
+    # Spread retries across the provided wait window.
+    target_total = max(2, int(total_wait_seconds))
     backoff_seconds: list[int] = []
     wait_seconds = 2
     total_wait = 0
@@ -39,14 +39,19 @@ def _build_retry_backoff(timeout_seconds: int) -> list[int]:
     return backoff_seconds
 
 
-RETRY_BACKOFF_SECONDS = _build_retry_backoff(SCAN_TIMEOUT_SECONDS)
+# Keep busy retries within a smaller window so the scan itself can still finish.
+BUSY_RETRY_WINDOW_SECONDS = max(10, min(int(SCAN_TIMEOUT_SECONDS * 0.2), 900))
+RETRY_BACKOFF_SECONDS = _build_retry_backoff(BUSY_RETRY_WINDOW_SECONDS)
 
-def _post_scan_request(url, payload, headers):
+
+def _post_scan_request(url, payload, headers, on_before_request=None, on_busy=None):
     last_response = None
     last_exception = None
     for wait_seconds in [0, *RETRY_BACKOFF_SECONDS]:
         if wait_seconds:
             time.sleep(wait_seconds)
+        if on_before_request:
+            on_before_request()
         try:
             response = httpx.post(
                 url,
@@ -59,6 +64,8 @@ def _post_scan_request(url, payload, headers):
             continue
         last_response = response
         if response.status_code == 429:
+            if on_busy:
+                on_busy()
             continue
         return response
     if last_response is not None and last_response.status_code == 429:
@@ -76,6 +83,7 @@ def _update_scan_status(
     raw_report=None,
     parsed_report=None,
     progress_percent=None,
+    reset_started_at=False,
 ):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -85,6 +93,7 @@ def _update_scan_status(
                 SET status = %s,
                     started_at = CASE
                         WHEN %s = 'running' THEN COALESCE(started_at, NOW())
+                        WHEN %s = 'queued' AND %s THEN NULL
                         ELSE started_at
                     END,
                     completed_at = CASE
@@ -100,6 +109,8 @@ def _update_scan_status(
                 (
                     status,
                     status,
+                    status,
+                    reset_started_at,
                     status,
                     error,
                     Json(raw_report) if raw_report is not None else None,
@@ -132,11 +143,26 @@ def zap_scan_task(
             "auth": auth,
             "scan_id": scan_id,
         }
-        _update_scan_status(scan_id, user_id, "running", error=None, progress_percent=5)
+
+        def mark_running():
+            _update_scan_status(scan_id, user_id, "running", error=None, progress_percent=1)
+
+        def mark_queued():
+            _update_scan_status(
+                scan_id,
+                user_id,
+                "queued",
+                error=None,
+                progress_percent=0,
+                reset_started_at=True,
+            )
+
         response = _post_scan_request(
             f"{ZAP_SCANNER_URL}/scan",
             payload,
             headers,
+            on_before_request=mark_running,
+            on_busy=mark_queued,
         )
         if response.status_code != 200:
             error_message = f"ZAP scan failed with status {response.status_code}"

@@ -691,6 +691,19 @@ def scan():
     if not lock_acquired:
         return jsonify({"error": "scanner busy"}), 429
 
+    # Reset session to avoid mixing previous scan results.
+    try:
+        session_name = f"scan_{_safe_scan_id(scan_id)}"
+        try:
+            zap.core.new_session(name=session_name, overwrite=True)
+        except TypeError:
+            try:
+                zap.core.new_session(session_name, True)
+            except TypeError:
+                zap.core.new_session()
+    except Exception as exc:
+        print(f"[!] Failed to reset ZAP session: {exc}")
+
     progress_state = {"last": -1}
 
     def report_progress(percent, phase=None):
