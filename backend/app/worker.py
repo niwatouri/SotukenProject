@@ -12,7 +12,9 @@ from rq import Worker, Queue, Connection
 from app.db import init_scan_schema
 
 listen = ['default']
-redis_conn = Redis(host="redis", port=6379)
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
 
 if __name__ == '__main__':
     init_scan_schema()

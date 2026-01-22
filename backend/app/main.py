@@ -37,7 +37,9 @@ def _init_schema() -> None:
     init_scan_schema()
 
 # Redis接続
-redis_conn = Redis(host="redis", port=6379)
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
 # 長時間スキャンに耐えるよう、デフォルトタイムアウトを伸ばしてキューを作成
 q = Queue(connection=redis_conn, default_timeout=SCAN_TIMEOUT_SECONDS)
 
