@@ -1,5 +1,6 @@
 # backend/app/tasks.py
 import httpx
+import logging
 import time
 from psycopg2.extras import Json
 
@@ -10,7 +11,14 @@ from app.config import (
 )
 from app.db import get_db_connection
 from app.report_parser import parse_zap_report
-from app.scan_utils import normalize_report, normalize_scan_types, scan_type_from_scan_types
+from app.scan_utils import (
+    normalize_report,
+    normalize_scan_types,
+    scan_type_from_scan_types,
+    validate_target_url,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def _build_retry_backoff(total_wait_seconds: int) -> list[int]:
@@ -125,6 +133,28 @@ def zap_scan_task(
     payload_scan_types = normalize_scan_types(scan_types)
     if not payload_scan_types:
         payload_scan_types = ["all"]
+
+    is_allowed, blocked_ip, error_code = validate_target_url(url)
+    if not is_allowed:
+        if blocked_ip:
+            logger.warning("blocked_target ip=%s url=%s scan_id=%s user_id=%s", blocked_ip, url, scan_id, user_id)
+            _update_scan_status(
+                scan_id,
+                user_id,
+                "failed",
+                error="Blocked target",
+                progress_percent=100,
+            )
+            raise RuntimeError("Blocked target")
+        _update_scan_status(
+            scan_id,
+            user_id,
+            "failed",
+            error="Invalid URL",
+            progress_percent=100,
+        )
+        raise RuntimeError(f"Invalid URL: {error_code}")
+
     try:
         headers = {"X-API-Key": ZAP_SCANNER_API_KEY} if ZAP_SCANNER_API_KEY else {}
         payload = {

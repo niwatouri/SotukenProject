@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any, Dict, Optional
 
 import jwt
@@ -21,10 +22,11 @@ from app.config import (
 )
 from app.db import get_db_connection, init_scan_schema
 from app.report_parser import parse_zap_report
-from app.scan_utils import normalize_report, scan_type_from_scan_types
+from app.scan_utils import normalize_report, scan_type_from_scan_types, validate_target_url
 from app.tasks import zap_scan_task
 
 app = FastAPI()
+logger = logging.getLogger(__name__)
 
 
 @app.on_event("startup")
@@ -440,6 +442,13 @@ async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_au
         raise HTTPException(status_code=401, detail="Invalid user payload")
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
+
+    is_allowed, blocked_ip, error_code = validate_target_url(url)
+    if not is_allowed:
+        if blocked_ip:
+            logger.warning("blocked_target ip=%s url=%s user_id=%s", blocked_ip, url, user_id)
+            raise HTTPException(status_code=403, detail="禁止されたターゲットです")
+        raise HTTPException(status_code=400, detail="Invalid URL")
 
     if not isinstance(scan_types, list) or len(scan_types) == 0:
         scan_types = ["all"]
