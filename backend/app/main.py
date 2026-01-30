@@ -75,11 +75,53 @@ def _verify_token(token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid token") from exc
 
 
+def _fetch_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, email
+                FROM users
+                WHERE id = %s
+                """,
+                (user_id,),
+            )
+            return cur.fetchone()
+
+
+def _fetch_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, email
+                FROM users
+                WHERE email = %s
+                """,
+                (email,),
+            )
+            return cur.fetchone()
+
+
+def _validate_user_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    email = payload.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid user payload")
+    user = _fetch_user_by_email(str(email))
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user payload")
+
+    payload["userId"] = int(user["id"])
+    payload["email"] = user["email"]
+    return payload
+
+
 async def require_auth(request: Request) -> Dict[str, Any]:
     token = _extract_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return _verify_token(token)
+    payload = _verify_token(token)
+    return _validate_user_payload(payload)
 
 
 def _verify_scanner_key(x_api_key: Optional[str]) -> None:

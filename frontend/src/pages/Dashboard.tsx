@@ -20,6 +20,42 @@ interface AIAdviceItem {
 }
 
 const TOKEN_STORAGE_KEY = 'auth_token';
+const PDF_FONT_URL = new URL('../assets/fonts/IPAexGothic.ttf', import.meta.url).toString();
+const PDF_FONT_NAME = 'IPAexGothic';
+const PDF_FONT_FILE = 'IPAexGothic.ttf';
+let pdfFontBase64Promise: Promise<string> | null = null;
+
+const loadPdfFontBase64 = async () => {
+  if (!pdfFontBase64Promise) {
+    pdfFontBase64Promise = fetch(PDF_FONT_URL)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('Failed to load PDF font');
+        }
+        return res.arrayBuffer();
+      })
+      .then((buffer) => {
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
+      });
+  }
+  return pdfFontBase64Promise;
+};
+
+const ensurePdfFont = async (pdf: jsPDF) => {
+  const fontList = pdf.getFontList();
+  if (!fontList[PDF_FONT_NAME]) {
+    const base64 = await loadPdfFontBase64();
+    pdf.addFileToVFS(PDF_FONT_FILE, base64);
+    pdf.addFont(PDF_FONT_FILE, PDF_FONT_NAME, 'normal');
+  }
+  pdf.setFont(PDF_FONT_NAME, 'normal');
+};
 
 const getPriorityFromSeverity = (severity?: VulnerabilityData['severity']): 'high' | 'medium' | 'low' => {
   switch (severity) {
@@ -340,8 +376,19 @@ function Dashboard() {
     color: severityColors[severity as keyof typeof severityColors]
   }));
 
-  const generatePDFReport = () => {
+  const isAiAdviceReady = scanResults.vulnerabilities.length === 0
+    ? true
+    : (aiAdvice?.length ?? 0) > 0;
+  const canDownloadPdf = !isLoadingAdvice && isAiAdviceReady;
+
+  const generatePDFReport = async () => {
+    if (!canDownloadPdf) {
+      alert('AI解析結果の取得中です。完了後にダウンロードしてください。');
+      return;
+    }
+
     const pdf = new jsPDF();
+    await ensurePdfFont(pdf);
     const pageWidth = pdf.internal.pageSize.width;
     
     // Title
@@ -382,6 +429,48 @@ function Dashboard() {
       
       yPosition += 40 + (descLines.length * 4);
     });
+
+    const adviceItems = aiAdvice ?? [];
+    if (adviceItems.length > 0) {
+      if (yPosition > 240) {
+        pdf.addPage();
+        yPosition = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.text('AI解析', 20, yPosition);
+      yPosition += 10;
+
+      adviceItems.forEach((item, index) => {
+        if (yPosition > 250) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+
+        const title = stripHtml(item.title || `解析 ${index + 1}`);
+        pdf.setFontSize(12);
+        pdf.text(`${index + 1}. ${title}`, 20, yPosition);
+        yPosition += 8;
+
+        pdf.setFontSize(10);
+        const summaryText = stripHtml(item.summary || '');
+        const summaryLines = pdf.splitTextToSize(`概要: ${summaryText}`, pageWidth - 50);
+        pdf.text(summaryLines, 25, yPosition);
+        yPosition += summaryLines.length * 4 + 4;
+
+        const impactText = stripHtml(item.impact || '');
+        const impactLines = pdf.splitTextToSize(`影響: ${impactText}`, pageWidth - 50);
+        pdf.text(impactLines, 25, yPosition);
+        yPosition += impactLines.length * 4 + 4;
+
+        const stepsText = item.steps && item.steps.length > 0
+          ? item.steps.map((step) => stripHtml(step)).join(' / ')
+          : '';
+        const stepsLines = pdf.splitTextToSize(`対策: ${stepsText}`, pageWidth - 50);
+        pdf.text(stepsLines, 25, yPosition);
+        yPosition += stepsLines.length * 4 + 8;
+      });
+    }
     
     pdf.save(`secureguard-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -539,10 +628,17 @@ function Dashboard() {
                 <h2 className="text-2xl font-bold text-gray-900">スキャン結果</h2>
                 <button
                   onClick={generatePDFReport}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={!canDownloadPdf}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                    canDownloadPdf
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   <Download className="w-4 h-4" />
-                  <span>PDFダウンロード</span>
+                  <span>
+                    {canDownloadPdf ? 'PDFダウンロード' : (isLoadingAdvice ? 'AI解析中...' : 'AI解析待ち')}
+                  </span>
                 </button>
               </div>
               
