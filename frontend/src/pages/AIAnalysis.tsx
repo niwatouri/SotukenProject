@@ -230,6 +230,8 @@ function AIAnalysis() {
     return null;
   }
 
+  const totalVulnerabilities = scanResults?.vulnerabilities?.length ?? 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* Header */}
@@ -287,8 +289,8 @@ function AIAnalysis() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold">{scanResults.riskScore}/100</div>
-              <div className="text-purple-100">総合リスクスコア</div>
+              <div className="text-2xl font-bold">{totalVulnerabilities}件</div>
+              <div className="text-purple-100">検出された脆弱性（合計）</div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
               <div className="text-2xl font-bold">{analysisData.criticalIssues}</div>

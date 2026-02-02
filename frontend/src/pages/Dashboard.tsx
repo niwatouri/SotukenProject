@@ -533,6 +533,7 @@ function Dashboard() {
     acc[vuln.severity] = (acc[vuln.severity] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
+  const totalVulnerabilities = scanResults.vulnerabilities.length;
 
   const chartData = Object.entries(severityCounts).map(([severity, count]) => ({
     severity: getSeverityLabel(severity),
@@ -572,7 +573,7 @@ function Dashboard() {
     pdf.setFontSize(12);
     pdf.text(`対象URL: ${scanResults.targetUrl}`, 20, 40);
     pdf.text(`スキャン実行日時: ${new Date(scanResults.timestamp).toLocaleString('ja-JP')}`, 20, 50);
-    pdf.text(`リスクスコア: ${scanResults.riskScore}/100`, 20, 60);
+    pdf.text(`検出された脆弱性: ${totalVulnerabilities}件`, 20, 60);
     
     // Summary
     pdf.setFontSize(14);
@@ -854,8 +855,8 @@ function Dashboard() {
                 <div className="flex items-center space-x-3">
                   <Shield className="w-5 h-5 text-orange-600" />
                   <div>
-                    <p className="text-sm text-gray-600">リスクスコア</p>
-                    <p className="font-semibold text-gray-900">{scanResults.riskScore}/100</p>
+                    <p className="text-sm text-gray-600">検出された脆弱性</p>
+                    <p className="font-semibold text-gray-900">{totalVulnerabilities}件</p>
                   </div>
                 </div>
               </div>
@@ -1122,8 +1123,8 @@ function Dashboard() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-2xl font-bold">{scanResults.riskScore}/100</div>
-                  <div className="text-purple-100">総合リスクスコア</div>
+                  <div className="text-2xl font-bold">{totalVulnerabilities}件</div>
+                  <div className="text-purple-100">検出された脆弱性（合計）</div>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
                   <div className="text-2xl font-bold">{analysisData.criticalIssues}</div>
