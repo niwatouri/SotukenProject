@@ -9,13 +9,18 @@ import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
 import { API_BASE_URL } from '../utils/api';
 
+type AISummaryStatus = 'pending' | 'processing' | 'failed' | 'completed' | 'skipped';
+
 interface AIAdviceItem {
   vulnId: string;
-  title: string;
-  summary: string;
-  impact: string;
-  steps: string[];
-  analogy: string;
+  alertKey?: string;
+  status: AISummaryStatus;
+  title?: string;
+  summary?: string;
+  impact?: string;
+  steps?: string[];
+  analogy?: string;
+  error_reason?: string;
 }
 
 type AdviceRecommendation = Recommendation & {
@@ -52,8 +57,35 @@ const getFallbackAnalogy = (vulnType: string) => {
   }
 };
 
+const getAiStatusMessage = (status: AISummaryStatus) => {
+  switch (status) {
+    case 'processing':
+      return 'AI解析中です。しばらくお待ちください。';
+    case 'failed':
+      return 'AI解析に失敗しました。';
+    case 'skipped':
+      return 'AI解析対象外です。';
+    case 'pending':
+    default:
+      return 'AI解析の生成待ちです。';
+  }
+};
+
+const normalizeAiStatus = (value: any): AISummaryStatus => {
+  switch (value) {
+    case 'completed':
+    case 'processing':
+    case 'failed':
+    case 'skipped':
+    case 'pending':
+      return value;
+    default:
+      return 'pending';
+  }
+};
+
 function AIAnalysis() {
-  const { scanResults } = useScan();
+  const { scanResults, scanId } = useScan();
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [aiAdvice, setAiAdvice] = useState<AIAdviceItem[] | null>(null);
@@ -70,7 +102,7 @@ function AIAnalysis() {
     }
 
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!token) {
+    if (!token || !scanId) {
       setAiAdvice(null);
       return;
     }
@@ -83,10 +115,10 @@ function AIAnalysis() {
 
     let isActive = true;
     const controller = new AbortController();
+    let retryTimer: number | undefined;
 
     const fetchAdvice = async () => {
       setIsLoadingAdvice(true);
-      setAiAdvice(null);
       try {
         const response = await fetch(`${API_BASE_URL}/advice`, {
           method: 'POST',
@@ -94,7 +126,7 @@ function AIAnalysis() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ vulnerabilities }),
+          body: JSON.stringify({ scan_id: scanId }),
           signal: controller.signal,
         });
 
@@ -110,9 +142,30 @@ function AIAnalysis() {
         }
 
         const data = await response.json();
-        const items = Array.isArray(data?.items) ? data.items : null;
-        if (isActive && items) {
-          setAiAdvice(items as AIAdviceItem[]);
+        const summaries = Array.isArray(data?.summaries) ? data.summaries : [];
+        const items = Array.isArray(data?.items) ? data.items : [];
+        const source = summaries.length > 0 ? summaries : items.map((item: any) => ({ ...item, status: 'completed' }));
+        const normalized = source
+          .filter((item: any) => item && (typeof item.vulnId === 'string' || typeof item.alertKey === 'string'))
+          .map((item: any) => ({
+            vulnId: String(item.vulnId ?? ''),
+            alertKey: typeof item.alertKey === 'string' ? item.alertKey : undefined,
+            status: normalizeAiStatus(item.status),
+            title: item.title ?? undefined,
+            summary: item.summary ?? undefined,
+            impact: item.impact ?? undefined,
+            steps: Array.isArray(item.steps) ? item.steps : undefined,
+            analogy: item.analogy ?? undefined,
+            error_reason: item.error_reason ?? undefined,
+          } as AIAdviceItem));
+
+        if (isActive) {
+          setAiAdvice(normalized);
+        }
+
+        const shouldPoll = normalized.some((item) => item.status === 'pending' || item.status === 'processing');
+        if (isActive && shouldPoll) {
+          retryTimer = window.setTimeout(fetchAdvice, 4000);
         }
       } catch (error) {
         if (isActive) {
@@ -130,23 +183,34 @@ function AIAnalysis() {
     return () => {
       isActive = false;
       controller.abort();
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
     };
-  }, [scanResults, logout]);
+  }, [scanResults, scanId, logout]);
 
   const analysisData = scanResults ? getAnalysisData(scanResults) : null;
   const vulnById = useMemo(() => {
     const entries = scanResults?.vulnerabilities?.map((vuln) => [vuln.id, vuln] as const) ?? [];
     return new Map(entries);
   }, [scanResults]);
+  const aiAdviceList = Array.isArray(aiAdvice) ? aiAdvice : [];
+  const adviceByKey = useMemo(() => {
+    const entries = aiAdviceList
+      .filter((item) => item && typeof item.alertKey === 'string')
+      .map((item) => [item.alertKey as string, item] as const);
+    return new Map(entries);
+  }, [aiAdviceList]);
   const adviceById = useMemo(() => {
-    const entries = (aiAdvice ?? [])
+    const entries = aiAdviceList
       .filter((item) => item && typeof item.vulnId === 'string')
       .map((item) => [item.vulnId, item] as const);
     return new Map(entries);
-  }, [aiAdvice]);
-  const hasAiAdvice = !isLoadingAdvice && (aiAdvice?.length ?? 0) > 0;
+  }, [aiAdviceList]);
+  const completedAdvice = aiAdviceList.filter((item) => item.status === 'completed');
+  const hasAiAdvice = !isLoadingAdvice && completedAdvice.length > 0;
   const recommendations: AdviceRecommendation[] = hasAiAdvice
-    ? aiAdvice!.map((item) => {
+    ? completedAdvice.map((item) => {
         const vuln = vulnById.get(item.vulnId);
         const safeSteps = Array.isArray(item.steps)
           ? item.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
@@ -317,7 +381,8 @@ function AIAnalysis() {
           
           <div className="space-y-8">
             {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => {
-              const advice = adviceById.get(vuln.id);
+              const alertKey = vuln.alertKey ?? vuln.id;
+              const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
               const summary = stripHtml(advice?.summary || vuln.description);
               const impact = stripHtml(advice?.impact || vuln.impact);
               const steps = Array.isArray(advice?.steps)

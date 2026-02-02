@@ -31,6 +31,27 @@ SCAN_SCHEMA_STATEMENTS = [
       parsed_report JSONB
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS ai_summaries (
+      id SERIAL PRIMARY KEY,
+      scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+      alert_key TEXT NOT NULL,
+      plugin_id TEXT,
+      affected_url TEXT,
+      parameter TEXT,
+      status TEXT NOT NULL,
+      title TEXT,
+      summary TEXT,
+      impact TEXT,
+      steps JSONB,
+      analogy TEXT,
+      error_reason TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(scan_id, alert_key)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_ai_summaries_scan_id ON ai_summaries(scan_id)",
     "CREATE INDEX IF NOT EXISTS idx_scans_user_created_at ON scans(user_id, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_scans_job_id ON scans(job_id)",
 ]

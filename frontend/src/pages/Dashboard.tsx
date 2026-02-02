@@ -10,13 +10,18 @@ import { jsPDF } from 'jspdf';
 import Footer from '../components/Footer';
 import { API_BASE_URL } from '../utils/api';
 
+type AISummaryStatus = 'pending' | 'processing' | 'failed' | 'completed' | 'skipped';
+
 interface AIAdviceItem {
   vulnId: string;
-  title: string;
-  summary: string;
-  impact: string;
-  steps: string[];
-  analogy: string;
+  alertKey?: string;
+  status: AISummaryStatus;
+  title?: string;
+  summary?: string;
+  impact?: string;
+  steps?: string[];
+  analogy?: string;
+  error_reason?: string;
 }
 
 const TOKEN_STORAGE_KEY = 'auth_token';
@@ -139,6 +144,65 @@ const getConfidenceTone = (confidence?: string | null) => {
   }
 };
 
+const getAiStatusLabel = (status: AISummaryStatus) => {
+  switch (status) {
+    case 'completed':
+      return '解析完了';
+    case 'processing':
+      return 'AI解析中';
+    case 'failed':
+      return '生成失敗';
+    case 'skipped':
+      return '対象外';
+    case 'pending':
+    default:
+      return '未生成';
+  }
+};
+
+const getAiStatusTone = (status: AISummaryStatus) => {
+  switch (status) {
+    case 'completed':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'processing':
+      return 'bg-blue-100 text-blue-700';
+    case 'failed':
+      return 'bg-red-100 text-red-700';
+    case 'skipped':
+      return 'bg-gray-200 text-gray-600';
+    case 'pending':
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
+};
+
+const getAiStatusMessage = (status: AISummaryStatus) => {
+  switch (status) {
+    case 'processing':
+      return 'AI解析中です。しばらくお待ちください。';
+    case 'failed':
+      return 'AI解析に失敗しました。';
+    case 'skipped':
+      return 'AI解析対象外です。';
+    case 'pending':
+    default:
+      return 'AI解析の生成待ちです。';
+  }
+};
+
+const normalizeAiStatus = (value: any): AISummaryStatus => {
+  switch (value) {
+    case 'completed':
+    case 'processing':
+    case 'failed':
+    case 'skipped':
+    case 'pending':
+      return value;
+    default:
+      return 'pending';
+  }
+};
+
 const trimSnippet = (snippet?: string[] | null) => {
   if (!Array.isArray(snippet)) {
     return [];
@@ -147,7 +211,7 @@ const trimSnippet = (snippet?: string[] | null) => {
 };
 
 function Dashboard() {
-  const { scanResults, loadScanById, loadScanHistory } = useScan();
+  const { scanResults, scanId, loadScanById, loadScanHistory } = useScan();
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState<'dashboard' | 'ai'>('dashboard');
@@ -157,6 +221,8 @@ function Dashboard() {
   const [loadingScanId, setLoadingScanId] = useState<number | null>(null);
   const [aiAdvice, setAiAdvice] = useState<AIAdviceItem[] | null>(null);
   const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
+  const [aiRefreshToken, setAiRefreshToken] = useState(0);
+  const [retryingKey, setRetryingKey] = useState<string | null>(null);
 
   // Scroll to top when component mounts or view changes
   useEffect(() => {
@@ -201,7 +267,7 @@ function Dashboard() {
     }
 
     const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!token) {
+    if (!token || !scanId) {
       setAiAdvice(null);
       return;
     }
@@ -214,10 +280,10 @@ function Dashboard() {
 
     let isActive = true;
     const controller = new AbortController();
+    let retryTimer: number | undefined;
 
     const fetchAdvice = async () => {
       setIsLoadingAdvice(true);
-      setAiAdvice(null);
       try {
         const response = await fetch(`${API_BASE_URL}/advice`, {
           method: 'POST',
@@ -225,7 +291,7 @@ function Dashboard() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ vulnerabilities }),
+          body: JSON.stringify({ scan_id: scanId }),
           signal: controller.signal,
         });
 
@@ -241,9 +307,30 @@ function Dashboard() {
         }
 
         const data = await response.json();
-        const items = Array.isArray(data?.items) ? data.items : null;
-        if (isActive && items) {
-          setAiAdvice(items as AIAdviceItem[]);
+        const summaries = Array.isArray(data?.summaries) ? data.summaries : [];
+        const items = Array.isArray(data?.items) ? data.items : [];
+        const source = summaries.length > 0 ? summaries : items.map((item: any) => ({ ...item, status: 'completed' }));
+        const normalized = source
+          .filter((item: any) => item && (typeof item.vulnId === 'string' || typeof item.alertKey === 'string'))
+          .map((item: any) => ({
+            vulnId: String(item.vulnId ?? ''),
+            alertKey: typeof item.alertKey === 'string' ? item.alertKey : undefined,
+            status: normalizeAiStatus(item.status),
+            title: item.title ?? undefined,
+            summary: item.summary ?? undefined,
+            impact: item.impact ?? undefined,
+            steps: Array.isArray(item.steps) ? item.steps : undefined,
+            analogy: item.analogy ?? undefined,
+            error_reason: item.error_reason ?? undefined,
+          } as AIAdviceItem));
+
+        if (isActive) {
+          setAiAdvice(normalized);
+        }
+
+        const shouldPoll = normalized.some((item) => item.status === 'pending' || item.status === 'processing');
+        if (isActive && shouldPoll) {
+          retryTimer = window.setTimeout(fetchAdvice, 4000);
         }
       } catch {
         if (isActive) {
@@ -261,8 +348,11 @@ function Dashboard() {
     return () => {
       isActive = false;
       controller.abort();
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+      }
     };
-  }, [scanResults, logout]);
+  }, [scanResults, scanId, logout, aiRefreshToken]);
 
   const handleLoadScan = async (scanId: number) => {
     setLoadingScanId(scanId);
@@ -270,6 +360,53 @@ function Dashboard() {
     setLoadingScanId(null);
     if (!ok) {
       alert('スキャン結果を取得できませんでした');
+    }
+  };
+
+  const handleRetryAdvice = async (alertKey: string) => {
+    if (!scanId) {
+      return;
+    }
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!token) {
+      return;
+    }
+    setRetryingKey(alertKey);
+    try {
+      const response = await fetch(`${API_BASE_URL}/advice/retry`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ scan_id: scanId, alert_key: alertKey }),
+      });
+
+      if (response.status === 401) {
+        logout();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('AI解析の再試行に失敗しました');
+      }
+
+      setAiAdvice((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        return prev.map((item) =>
+          item.alertKey === alertKey
+            ? { ...item, status: 'processing', error_reason: undefined }
+            : item
+        );
+      });
+      setAiRefreshToken((value) => value + 1);
+    } catch (error) {
+      console.error(error);
+      alert('AI解析の再試行に失敗しました');
+    } finally {
+      setRetryingKey(null);
     }
   };
 
@@ -409,9 +546,12 @@ function Dashboard() {
     color: severityColors[severity as keyof typeof severityColors]
   }));
 
+  const aiAdviceList = Array.isArray(aiAdvice) ? aiAdvice : [];
+  const hasPendingAdvice = aiAdviceList.some((item) => item.status === 'pending' || item.status === 'processing');
+  const hasCompletedAdvice = aiAdviceList.some((item) => item.status === 'completed');
   const isAiAdviceReady = scanResults.vulnerabilities.length === 0
     ? true
-    : (aiAdvice?.length ?? 0) > 0;
+    : aiAdviceList.length > 0 && !hasPendingAdvice;
   const canDownloadPdf = !isLoadingAdvice && isAiAdviceReady;
 
   const generatePDFReport = async () => {
@@ -463,7 +603,7 @@ function Dashboard() {
       yPosition += 40 + (descLines.length * 4);
     });
 
-    const adviceItems = aiAdvice ?? [];
+    const adviceItems = aiAdviceList.filter((item) => item.status === 'completed');
     if (adviceItems.length > 0) {
       if (yPosition > 240) {
         pdf.addPage();
@@ -509,11 +649,6 @@ function Dashboard() {
   };
 
   const analysisData = getAnalysisData(scanResults);
-  const hasAiAdvice = !isLoadingAdvice && (aiAdvice?.length ?? 0) > 0;
-  const aiContentState = hasAiAdvice ? 'ready' : (isLoadingAdvice ? 'loading' : 'fallback');
-  const aiPlaceholderText = aiContentState === 'loading'
-    ? 'AI解析中です。しばらくお待ちください。'
-    : 'AI解析結果を取得できませんでした。';
   const aiMissingSummaryText = 'AI解析の要約がありません。';
   const aiMissingImpactText = 'AI解析の影響情報がありません。';
   const aiMissingStepsText = 'AI解析の改善案がありません。';
@@ -523,13 +658,19 @@ function Dashboard() {
       ? '中'
       : '低';
   const vulnById = new Map(scanResults.vulnerabilities.map((vuln) => [vuln.id, vuln]));
+  const adviceByKey = new Map(
+    aiAdviceList
+      .filter((item) => item && typeof item.alertKey === 'string')
+      .map((item) => [item.alertKey as string, item] as const),
+  );
   const adviceById = new Map(
-    (aiAdvice ?? [])
+    aiAdviceList
       .filter((item) => item && typeof item.vulnId === 'string')
       .map((item) => [item.vulnId, item] as const),
   );
-  const recommendations = hasAiAdvice
-    ? aiAdvice!.map((item) => {
+  const completedAdvice = aiAdviceList.filter((item) => item.status === 'completed');
+  const recommendations = hasCompletedAdvice
+    ? completedAdvice.map((item) => {
         const vuln = vulnById.get(item.vulnId);
         const description = item.summary
           ? stripHtml(item.summary)
@@ -547,17 +688,23 @@ function Dashboard() {
       })
     : analysisData.recommendations;
   const mostCritical = analysisData.mostCritical;
-  const mostCriticalAdvice = mostCritical ? adviceById.get(mostCritical.id) : undefined;
+  const mostCriticalKey = mostCritical?.alertKey ?? mostCritical?.id;
+  const mostCriticalAdvice = mostCriticalKey
+    ? (adviceByKey.get(mostCriticalKey) || adviceById.get(mostCritical.id))
+    : undefined;
+  const mostCriticalStatus: AISummaryStatus = mostCriticalAdvice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');
   const mostCriticalTitle = mostCritical
-    ? (mostCriticalAdvice?.title ? stripHtml(mostCriticalAdvice.title) : hasAiAdvice ? '脆弱性項目' : 'AI解析中')
+    ? (mostCriticalAdvice?.title
+        ? stripHtml(mostCriticalAdvice.title)
+        : (mostCritical.type || getAiStatusLabel(mostCriticalStatus)))
     : '';
   const mostCriticalSummary = mostCritical
-    ? (hasAiAdvice
+    ? (mostCriticalStatus === 'completed'
         ? (mostCriticalAdvice?.summary ? stripHtml(mostCriticalAdvice.summary) : aiMissingSummaryText)
-        : aiPlaceholderText)
+        : getAiStatusMessage(mostCriticalStatus))
     : '';
   const mostCriticalImpact = mostCritical
-    ? (hasAiAdvice
+    ? (mostCriticalStatus === 'completed'
         ? (mostCriticalAdvice?.impact ? stripHtml(mostCriticalAdvice.impact) : aiMissingImpactText)
         : '')
     : '';
@@ -806,24 +953,25 @@ function Dashboard() {
               <h3 className="text-lg font-semibold text-gray-900 mb-6">検出された脆弱性</h3>
               <div className="space-y-4">
                 {scanResults.vulnerabilities.map((vuln, index) => {
-                  const advice = adviceById.get(vuln.id);
+                  const alertKey = vuln.alertKey ?? vuln.id;
+                  const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
+                  const status = advice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');
+                  const statusMessage = getAiStatusMessage(status);
                   const title = advice?.title
                     ? stripHtml(advice.title)
-                    : hasAiAdvice
-                      ? '脆弱性項目'
-                      : 'AI解析中';
-                  const description = hasAiAdvice
+                    : (vuln.type || '脆弱性項目');
+                  const description = status === 'completed'
                     ? (advice?.summary ? stripHtml(advice.summary) : aiMissingSummaryText)
-                    : aiPlaceholderText;
-                  const impact = hasAiAdvice
+                    : statusMessage;
+                  const impact = status === 'completed'
                     ? (advice?.impact ? stripHtml(advice.impact) : aiMissingImpactText)
-                    : aiPlaceholderText;
-                  const steps = hasAiAdvice && Array.isArray(advice?.steps)
+                    : statusMessage;
+                  const steps = status === 'completed' && Array.isArray(advice?.steps)
                     ? advice.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
                     : [];
-                  const solutionText = hasAiAdvice
+                  const solutionText = status === 'completed'
                     ? (steps.length > 0 ? steps.join(' / ') : aiMissingStepsText)
-                    : aiPlaceholderText;
+                    : statusMessage;
                   const evidence = vuln.evidence;
                   const hasEvidence = !!(evidence && (
                     evidence.affected_url ||
@@ -850,6 +998,9 @@ function Dashboard() {
                           >
                             {getSeverityLabel(vuln.severity)}
                           </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getAiStatusTone(status)}`}>
+                            {getAiStatusLabel(status)}
+                          </span>
                           {vuln.cveId && (
                             <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
                               {vuln.cveId}
@@ -860,6 +1011,9 @@ function Dashboard() {
                       </div>
 
                       <p className="text-gray-700 mb-3">{description}</p>
+                      {status === 'failed' && advice?.error_reason && (
+                        <p className="text-xs text-red-600 mb-2">失敗理由: {stripHtml(advice.error_reason)}</p>
+                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
@@ -871,6 +1025,22 @@ function Dashboard() {
                           <p className="text-gray-600">{solutionText}</p>
                         </div>
                       </div>
+
+                      {status === 'failed' && (
+                        <div className="mt-3">
+                          <button
+                            onClick={() => handleRetryAdvice(alertKey)}
+                            disabled={retryingKey === alertKey}
+                            className={`px-3 py-1 rounded-md text-xs font-medium ${
+                              retryingKey === alertKey
+                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                : 'bg-red-600 text-white hover:bg-red-700'
+                            }`}
+                          >
+                            {retryingKey === alertKey ? '再試行中...' : '再試行'}
+                          </button>
+                        </div>
+                      )}
 
                       <div className="mt-4 border-t border-gray-100 pt-4">
                         <div className="flex items-center justify-between mb-3">
@@ -1042,23 +1212,24 @@ function Dashboard() {
               
               <div className="space-y-8">
                 {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => {
-                  const advice = adviceById.get(vuln.id);
+                  const alertKey = vuln.alertKey ?? vuln.id;
+                  const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
+                  const status = advice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');
+                  const statusMessage = getAiStatusMessage(status);
                   const title = advice?.title
                     ? stripHtml(advice.title)
-                    : hasAiAdvice
-                      ? '脆弱性項目'
-                      : 'AI解析中';
-                  const summary = hasAiAdvice
+                    : (vuln.type || '脆弱性項目');
+                  const summary = status === 'completed'
                     ? (advice?.summary ? stripHtml(advice.summary) : aiMissingSummaryText)
-                    : aiPlaceholderText;
-                  const impact = hasAiAdvice
+                    : statusMessage;
+                  const impact = status === 'completed'
                     ? (advice?.impact ? stripHtml(advice.impact) : aiMissingImpactText)
-                    : aiPlaceholderText;
-                  const steps = hasAiAdvice && Array.isArray(advice?.steps)
+                    : statusMessage;
+                  const steps = status === 'completed' && Array.isArray(advice?.steps)
                     ? advice.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
                     : [];
-                  const analogyFromAi = hasAiAdvice && advice?.analogy ? stripHtml(advice.analogy) : '';
-                  const analogy = hasAiAdvice ? (analogyFromAi || getFallbackAnalogy(vuln.type)) : '';
+                  const analogyFromAi = status === 'completed' && advice?.analogy ? stripHtml(advice.analogy) : '';
+                  const analogy = status === 'completed' ? (analogyFromAi || getFallbackAnalogy(vuln.type)) : '';
 
                   return (
                     <div key={`${vuln.id}-${index}`} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
@@ -1086,7 +1257,7 @@ function Dashboard() {
                           </ul>
                         ) : (
                           <p className="text-gray-700 mb-4">
-                            {hasAiAdvice ? aiMissingStepsText : aiPlaceholderText}
+                            {status === 'completed' ? aiMissingStepsText : statusMessage}
                           </p>
                         )}
                         

@@ -1,20 +1,22 @@
-import json
 import logging
 from typing import Any, Dict, Optional
 
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI
 from psycopg2.extras import Json
 from redis import Redis
 from rq import Queue
 from rq.job import Job
 
+from app.ai_summary_store import (
+    ensure_ai_summary,
+    fetch_ai_summaries,
+    fetch_ai_summary,
+    upsert_ai_summary,
+)
 from app.config import (
     JWT_SECRET,
-    OPENAI_API_KEY,
-    OPENAI_MODEL,
     REDIS_HOST,
     REDIS_PORT,
     SCAN_TIMEOUT_SECONDS,
@@ -23,7 +25,7 @@ from app.config import (
 from app.db import get_db_connection, init_scan_schema
 from app.report_parser import parse_zap_report
 from app.scan_utils import normalize_report, scan_type_from_scan_types, validate_target_url
-from app.tasks import zap_scan_task
+from app.tasks import ai_summary_task, zap_scan_task
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
@@ -238,6 +240,7 @@ def _normalize_vulnerabilities(raw_vulns: Any) -> list[Dict[str, Any]]:
             port_value = None
         normalized.append({
             "id": str(vuln_id),
+            "alertKey": str(vuln.get("alertKey") or vuln_id),
             "type": str(vuln.get("type") or ""),
             "severity": str(vuln.get("severity") or ""),
             "port": port_value,
@@ -245,55 +248,31 @@ def _normalize_vulnerabilities(raw_vulns: Any) -> list[Dict[str, Any]]:
             "impact": str(vuln.get("impact") or ""),
             "solution": str(vuln.get("solution") or ""),
             "cveId": vuln.get("cveId") or None,
+            "evidence": vuln.get("evidence") or None,
         })
     return normalized
 
 
-def _generate_ai_advice(vulnerabilities: list[Dict[str, Any]]) -> Dict[str, Any]:
-    if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
-        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    payload = json.dumps(vulnerabilities, ensure_ascii=False)
-    system_message = (
-        "あなたはセキュリティアナリストです。入力された脆弱性ごとに、"
-        "日本語で分かりやすい解説と改善アドバイスを生成してください。"
-        "出力はJSONのみで、余計な説明やMarkdownは不要です。"
-    )
-    user_message = (
-        "以下の脆弱性一覧に対して、必ず同じ件数分のitemsを返してください。\n"
-        "出力形式:\n"
-        '{"items":[{"vulnId":"<id>","title":"短いタイトル","summary":"概要(1-2文)",'
-        '"impact":"影響","steps":["対策手順1","対策手順2"],"analogy":"わかりやすい例え"}]}\n'
-        "vulnIdは入力のidをそのまま使用してください。\n"
-        "脆弱性一覧:\n"
-        f"{payload}"
-    )
-    try:
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=0.2,
-            response_format={"type": "json_object"},
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="AIアドバイス生成に失敗しました") from exc
-
-    if not response.choices:
-        raise HTTPException(status_code=503, detail="AIアドバイスの生成結果が空です")
-
-    content = response.choices[0].message.content or ""
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=503, detail="AIアドバイスの解析に失敗しました") from exc
-
-    if not isinstance(parsed, dict) or not isinstance(parsed.get("items"), list):
-        raise HTTPException(status_code=503, detail="AIアドバイスの形式が不正です")
-
-    return parsed
+def _build_ai_targets(parsed_report: Dict[str, Any]) -> list[Dict[str, Any]]:
+    raw_vulns = parsed_report.get("vulnerabilities")
+    vulnerabilities = _normalize_vulnerabilities(raw_vulns)
+    targets: list[Dict[str, Any]] = []
+    for vuln in vulnerabilities:
+        vuln_id = vuln.get("id")
+        if not vuln_id:
+            continue
+        evidence = vuln.get("evidence") if isinstance(vuln.get("evidence"), dict) else {}
+        alert_key = vuln.get("alertKey") or vuln_id
+        plugin_id = str(vuln_id).split("-", 1)[0] if vuln_id else None
+        targets.append({
+            "vuln": vuln,
+            "vuln_id": str(vuln_id),
+            "alert_key": str(alert_key),
+            "plugin_id": plugin_id,
+            "affected_url": evidence.get("affected_url"),
+            "parameter": evidence.get("parameter"),
+        })
+    return targets
 
 
 def _fetch_scans(user_id: int, limit: int, offset: int) -> list[Dict[str, Any]]:
@@ -426,18 +405,9 @@ async def get_advice(request: Request, user: Dict[str, Any] = Depends(require_au
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid user payload")
 
-    if "vulnerabilities" in data:
-        raw_vulns = data.get("vulnerabilities")
-        if not isinstance(raw_vulns, list):
-            raise HTTPException(status_code=400, detail="vulnerabilities must be a list")
-        vulnerabilities = _normalize_vulnerabilities(raw_vulns)
-        if not vulnerabilities:
-            return {"items": []}
-        return _generate_ai_advice(vulnerabilities)
-
     scan_id = data.get("scan_id")
     if scan_id is None:
-        raise HTTPException(status_code=400, detail="scan_id or vulnerabilities are required")
+        raise HTTPException(status_code=400, detail="scan_id is required")
     try:
         scan_id = int(scan_id)
     except (TypeError, ValueError) as exc:
@@ -446,10 +416,138 @@ async def get_advice(request: Request, user: Dict[str, Any] = Depends(require_au
     scan = _fetch_scan_by_id(user_id, scan_id)
     if not scan or not scan.get("parsed_report"):
         raise HTTPException(status_code=404, detail="Scan not found")
-    vulnerabilities = _normalize_vulnerabilities(scan["parsed_report"].get("vulnerabilities"))
-    if not vulnerabilities:
-        return {"items": []}
-    return _generate_ai_advice(vulnerabilities)
+
+    targets = _build_ai_targets(scan["parsed_report"])
+    if not targets:
+        return {"items": [], "summaries": []}
+
+    for target in targets:
+        ensure_ai_summary(
+            scan_id,
+            target["alert_key"],
+            target["plugin_id"],
+            target["affected_url"],
+            target["parameter"],
+            status="pending",
+        )
+
+    stored = fetch_ai_summaries(scan_id)
+    if stored:
+        statuses = {row.get("status") for row in stored if row.get("status")}
+        needs_enqueue = ("processing" not in statuses) and ("pending" in statuses)
+        if needs_enqueue:
+            try:
+                q.enqueue(
+                    ai_summary_task,
+                    scan_id,
+                    job_timeout=SCAN_TIMEOUT_SECONDS,
+                    description=f"ai_summary_task(scan_id={scan_id})",
+                )
+            except Exception as exc:
+                logger.warning("Failed to enqueue ai_summary_task scan_id=%s error=%s", scan_id, exc)
+    stored_by_key = {row["alert_key"]: row for row in stored}
+
+    summaries: list[Dict[str, Any]] = []
+    items: list[Dict[str, Any]] = []
+    for target in targets:
+        vuln_id = target["vuln_id"]
+        alert_key = target["alert_key"]
+        stored_row = stored_by_key.get(alert_key)
+        status = stored_row.get("status") if stored_row else "pending"
+
+        payload = {
+            "vulnId": vuln_id,
+            "alertKey": alert_key,
+            "status": status,
+            "title": stored_row.get("title") if stored_row else None,
+            "summary": stored_row.get("summary") if stored_row else None,
+            "impact": stored_row.get("impact") if stored_row else None,
+            "steps": stored_row.get("steps") if stored_row else None,
+            "analogy": stored_row.get("analogy") if stored_row else None,
+            "error_reason": stored_row.get("error_reason") if stored_row else None,
+        }
+        summaries.append(payload)
+        if status == "completed":
+            items.append({
+                "vulnId": vuln_id,
+                "alertKey": alert_key,
+                "title": payload["title"],
+                "summary": payload["summary"],
+                "impact": payload["impact"],
+                "steps": payload["steps"],
+                "analogy": payload["analogy"],
+            })
+
+    return {"items": items, "summaries": summaries}
+
+
+@app.post("/advice/retry")
+async def retry_advice(request: Request, user: Dict[str, Any] = Depends(require_auth)):
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid request payload")
+
+    user_id = user.get("userId")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user payload")
+
+    scan_id = data.get("scan_id")
+    alert_key = data.get("alert_key")
+    if scan_id is None or not alert_key:
+        raise HTTPException(status_code=400, detail="scan_id and alert_key are required")
+    try:
+        scan_id = int(scan_id)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="scan_id must be numeric") from exc
+
+    scan = _fetch_scan_by_id(user_id, scan_id)
+    if not scan or not scan.get("parsed_report"):
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    targets = _build_ai_targets(scan["parsed_report"])
+    target = next(
+        (
+            item for item in targets
+            if item["alert_key"] == str(alert_key) or item["vuln_id"] == str(alert_key)
+        ),
+        None,
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    ensure_ai_summary(
+        scan_id,
+        target["alert_key"],
+        target["plugin_id"],
+        target["affected_url"],
+        target["parameter"],
+        status="pending",
+    )
+
+    existing = fetch_ai_summary(scan_id, target["alert_key"])
+    if existing and existing.get("status") == "processing":
+        raise HTTPException(status_code=409, detail="Already processing")
+
+    upsert_ai_summary(scan_id, target["alert_key"], status="processing")
+
+    try:
+        q.enqueue(
+            ai_summary_task,
+            scan_id,
+            target["alert_key"],
+            job_timeout=SCAN_TIMEOUT_SECONDS,
+            description=f"ai_summary_task(scan_id={scan_id}, alert_key={target['alert_key']})",
+        )
+    except Exception as exc:
+        upsert_ai_summary(
+            scan_id,
+            target["alert_key"],
+            status="failed",
+            error_reason=str(exc),
+        )
+        raise HTTPException(status_code=500, detail="Failed to queue AI summary") from exc
+
+    return {"status": "queued"}
 
 
 @app.post("/scan-progress")

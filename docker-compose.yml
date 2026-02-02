@@ -111,6 +111,8 @@ services:
     environment:
       - ZAP_SCANNER_URL=http://zap-scanner:5000
       - ZAP_SCANNER_API_KEY=${ZAP_SCANNER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
       - SCAN_TIMEOUT_SECONDS=${SCAN_TIMEOUT_SECONDS}
       - REDIS_HOST=redis
       - REDIS_PORT=6379

@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../utils/api';
 
 export interface VulnerabilityData {
   id: string;
+  alertKey?: string;
   type: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   port: number;
@@ -76,6 +77,7 @@ export type ScanAuthConfig =
 
 interface ScanContextType {
   scanResults: ScanResults | null;
+  scanId: number | null;
   isScanning: boolean;
   scanProgress: number;
   restoreLatestScan: () => Promise<boolean>;
@@ -138,6 +140,7 @@ const sanitizeScanResults = (results: ScanResults): ScanResults => ({
 
 export function ScanProvider({ children }: { children: React.ReactNode }) {
   const [scanResults, setScanResults] = useState<ScanResults | null>(null);
+  const [scanId, setScanId] = useState<number | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const { logout } = useAuth();
@@ -177,10 +180,14 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
       }
       const data = await response.json();
       const parsed = data?.scan?.parsed_report;
+      const latestId = data?.scan?.id;
       if (!isValidScanResults(parsed)) {
         return false;
       }
       setScanResults(sanitizeScanResults(parsed));
+      if (typeof latestId === 'number') {
+        setScanId(latestId);
+      }
       return true;
     } catch {
       return false;
@@ -239,6 +246,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       setScanResults(sanitizeScanResults(parsed));
+      setScanId(scanId);
       return true;
     } catch {
       return false;
@@ -252,6 +260,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   ): Promise<boolean> => {
     setIsScanning(true);
     setScanResults(null);
+    setScanId(null);
     setScanProgress(0);
 
     try {
@@ -279,9 +288,12 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`ジョブ投入に失敗しました: ${response.statusText}`);
       }
 
-      const { job_id: jobId } = await response.json();
+      const { job_id: jobId, scan_id: responseScanId } = await response.json();
       if (!jobId) {
         throw new Error('ジョブIDの取得に失敗しました');
+      }
+      if (typeof responseScanId === 'number') {
+        setScanId(responseScanId);
       }
 
       console.log('✅ スキャンジョブ投入:', jobId);
@@ -359,6 +371,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
 
   const clearResults = () => {
     setScanResults(null);
+    setScanId(null);
   };
 
   useEffect(() => {
@@ -368,6 +381,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   return (
     <ScanContext.Provider value={{
       scanResults,
+      scanId,
       isScanning,
       scanProgress,
       restoreLatestScan,

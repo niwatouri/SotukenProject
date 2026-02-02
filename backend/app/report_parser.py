@@ -132,6 +132,15 @@ def _combine_header_body(header: Optional[str], body: Optional[str]) -> Optional
     return header or body
 
 
+def build_alert_key(plugin_id: str, affected_url: Optional[str], parameter: Optional[str]) -> str:
+    parts = [str(plugin_id or "unknown")]
+    if affected_url:
+        parts.append(affected_url)
+    if parameter:
+        parts.append(parameter)
+    return "|".join(parts)
+
+
 def parse_zap_report(raw_json: Dict[str, Any], default_scan_type: str = "bulk", default_target_url: Optional[str] = None) -> Dict[str, Any]:
     """
     ZAPのJSONレポートをフロントのScanResults形式に変換する。
@@ -226,6 +235,7 @@ def parse_zap_report(raw_json: Dict[str, Any], default_scan_type: str = "bulk", 
 
             vulnerabilities.append({
                 "id": vuln_id,
+                "alertKey": build_alert_key(plugin_id, affected_url, parameter),
                 "type": alert.get("alert") or alert.get("name") or "Unknown",
                 "severity": severity,
                 "port": port_for_vuln,

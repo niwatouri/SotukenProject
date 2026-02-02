@@ -33,5 +33,5 @@ ZAP_SCANNER_URL = os.getenv("ZAP_SCANNER_URL", "http://zap-scanner:5000")
 ZAP_SCANNER_API_KEY = os.getenv("ZAP_SCANNER_API_KEY")
 
 JWT_SECRET = os.getenv("JWT_SECRET")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_API_KEY = _read_str_env("OPENAI_API_KEY", "")
+OPENAI_MODEL = _read_str_env("OPENAI_MODEL", "gpt-4o-mini")

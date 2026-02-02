@@ -1,14 +1,25 @@
 # backend/app/tasks.py
 import httpx
+import json
 import logging
 import time
+from typing import Any, Dict, Optional
+
+from openai import OpenAI
 from psycopg2.extras import Json
+from redis import Redis
+from rq import Queue
 
 from app.config import (
+    OPENAI_API_KEY,
+    OPENAI_MODEL,
+    REDIS_HOST,
+    REDIS_PORT,
     SCAN_TIMEOUT_SECONDS,
     ZAP_SCANNER_API_KEY,
     ZAP_SCANNER_URL,
 )
+from app.ai_summary_store import ensure_ai_summary, fetch_ai_summary, upsert_ai_summary
 from app.db import get_db_connection
 from app.report_parser import parse_zap_report
 from app.scan_utils import (
@@ -19,6 +30,10 @@ from app.scan_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+# AI要約タスク用のキュー（default）
+redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
+ai_queue = Queue(connection=redis_conn, default_timeout=SCAN_TIMEOUT_SECONDS)
 
 
 def _build_retry_backoff(total_wait_seconds: int) -> list[int]:
@@ -118,6 +133,157 @@ def _update_scan_status(
                     user_id,
                 ),
             )
+
+
+def _fetch_parsed_report(scan_id: int) -> Optional[Dict[str, Any]]:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT parsed_report
+                FROM scans
+                WHERE id = %s
+                """,
+                (scan_id,),
+            )
+            row = cur.fetchone()
+            return row.get("parsed_report") if row else None
+
+
+def _normalize_ai_steps(steps: Any) -> Optional[list[str]]:
+    if not isinstance(steps, list):
+        return None
+    return [str(step) for step in steps if step is not None]
+
+
+def _call_ai_for_vulnerability(vulnerability: Dict[str, Any]) -> Dict[str, Any]:
+    if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
+        raise RuntimeError("OPENAI_API_KEY is not configured")
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    payload = json.dumps(vulnerability, ensure_ascii=False)
+    system_message = (
+        "あなたはセキュリティアナリストです。入力された脆弱性に対して、"
+        "日本語で分かりやすい解説と改善アドバイスを生成してください。"
+        "出力はJSONのみで、余計な説明やMarkdownは不要です。"
+    )
+    user_message = (
+        "以下の脆弱性に対して、必ず1件のitemsを返してください。\n"
+        "出力形式:\n"
+        '{"items":[{"vulnId":"<id>","title":"短いタイトル","summary":"概要(1-2文)",'
+        '"impact":"影響","steps":["対策手順1","対策手順2"],"analogy":"わかりやすい例え"}]}\n'
+        "vulnIdは入力のidをそのまま使用してください。\n"
+        "脆弱性:\n"
+        f"{payload}"
+    )
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    if not response.choices:
+        raise RuntimeError("AI response empty")
+    content = response.choices[0].message.content or ""
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("AI response invalid JSON") from exc
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("items"), list):
+        raise RuntimeError("AI response invalid")
+    if not parsed["items"]:
+        raise RuntimeError("AI response empty items")
+    item = parsed["items"][0]
+    if not isinstance(item, dict):
+        raise RuntimeError("AI response item invalid")
+    return item
+
+
+def _should_skip_vulnerability(vulnerability: Dict[str, Any]) -> bool:
+    return not vulnerability.get("type") and not vulnerability.get("description")
+
+
+def ai_summary_task(scan_id: int, target_alert_key: Optional[str] = None) -> None:
+    parsed_report = _fetch_parsed_report(scan_id)
+    if not isinstance(parsed_report, dict):
+        logger.warning("ai_summary_task: parsed_report missing scan_id=%s", scan_id)
+        return
+
+    raw_vulns = parsed_report.get("vulnerabilities")
+    if not isinstance(raw_vulns, list) or not raw_vulns:
+        return
+
+    targets: list[Dict[str, Any]] = []
+    for vuln in raw_vulns:
+        if not isinstance(vuln, dict):
+            continue
+        vuln_id = vuln.get("id") or vuln.get("vulnId")
+        if not vuln_id:
+            continue
+        vuln_id_str = str(vuln_id)
+        alert_key = vuln.get("alertKey") or vuln_id_str
+        alert_key = str(alert_key)
+        if target_alert_key and str(target_alert_key) not in {alert_key, vuln_id_str}:
+            continue
+
+        evidence = vuln.get("evidence") if isinstance(vuln.get("evidence"), dict) else {}
+        plugin_id = vuln_id_str.split("-", 1)[0] if vuln_id_str else None
+        affected_url = evidence.get("affected_url")
+        parameter = evidence.get("parameter")
+
+        ensure_ai_summary(
+            scan_id,
+            alert_key,
+            plugin_id,
+            affected_url,
+            parameter,
+            status="pending",
+        )
+        targets.append({
+            "alert_key": alert_key,
+            "vulnerability": vuln,
+        })
+
+    if not targets:
+        return
+
+    for target in targets:
+        alert_key = target["alert_key"]
+        vulnerability = target["vulnerability"]
+        existing = fetch_ai_summary(scan_id, alert_key)
+        if existing and not target_alert_key:
+            existing_status = existing.get("status")
+            if existing_status in {"completed", "failed", "skipped"}:
+                continue
+        if _should_skip_vulnerability(vulnerability):
+            upsert_ai_summary(scan_id, alert_key, status="skipped")
+            continue
+
+        try:
+            upsert_ai_summary(scan_id, alert_key, status="processing")
+            item = _call_ai_for_vulnerability(vulnerability)
+            steps = _normalize_ai_steps(item.get("steps"))
+            upsert_ai_summary(
+                scan_id,
+                alert_key,
+                status="completed",
+                title=item.get("title"),
+                summary=item.get("summary"),
+                impact=item.get("impact"),
+                steps=steps,
+                analogy=item.get("analogy"),
+            )
+        except Exception as exc:
+            reason = str(exc)
+            upsert_ai_summary(
+                scan_id,
+                alert_key,
+                status="failed",
+                error_reason=reason,
+            )
+            continue
 
 
 def zap_scan_task(
@@ -221,6 +387,16 @@ def zap_scan_task(
         parsed_report=parsed_report,
         progress_percent=100,
     )
+
+    try:
+        ai_queue.enqueue(
+            ai_summary_task,
+            scan_id,
+            job_timeout=SCAN_TIMEOUT_SECONDS,
+            description=f"ai_summary_task(scan_id={scan_id})",
+        )
+    except Exception as exc:
+        logger.warning("Failed to enqueue ai_summary_task scan_id=%s error=%s", scan_id, exc)
 
     return {
         "scan_id": scan_id,
