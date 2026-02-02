@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Brain, Shield, Home, Lightbulb, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
 import { useScan, VulnerabilityData } from '../contexts/ScanContext';
 import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
-import { stripHtml } from '../utils/text';
+import { AI_GENERAL_LABEL, normalizeAiSteps, normalizeAiText, stripHtml } from '../utils/text';
 import type { Recommendation } from '../utils/analysis';
 import { useAuth } from '../contexts/AuthContext';
 import Footer from '../components/Footer';
@@ -385,14 +385,12 @@ function AIAnalysis() {
             {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => {
               const alertKey = vuln.alertKey ?? vuln.id;
               const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
-              const summary = stripHtml(advice?.summary || vuln.description);
-              const impact = stripHtml(advice?.impact || vuln.impact);
+              const summary = normalizeAiText(advice?.summary || vuln.description);
+              const impact = normalizeAiText(advice?.impact || vuln.impact);
               const steps = Array.isArray(advice?.steps)
-                ? advice?.steps
-                    .map((step) => stripHtml(step))
-                    .filter((step) => step.length > 0)
+                ? normalizeAiSteps(advice.steps)
                 : [];
-              const analogyFromAi = stripHtml(advice?.analogy || '');
+              const analogyFromAi = normalizeAiText(advice?.analogy || '');
               const analogy = analogyFromAi || getFallbackAnalogy(vuln.type);
               return (
               <div key={`${vuln.id}-${index}`} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
@@ -406,6 +404,7 @@ function AIAnalysis() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div>
                     <h5 className="font-semibold text-gray-900 mb-3">技術的解説</h5>
+                    <p className="text-xs text-gray-500 mb-2">{AI_GENERAL_LABEL}</p>
                     <p className="text-gray-700 mb-4">{summary}</p>
                     <p className="text-gray-700"><strong>影響:</strong> {impact}</p>
                   </div>

@@ -4,7 +4,7 @@ import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Shield, AlertTriangle, Activity, Globe, Download, Brain, Home, Clock, Target, BarChart3, CheckCircle, Lightbulb } from 'lucide-react';
 import { ScanHistoryItem, useScan, VulnerabilityData } from '../contexts/ScanContext';
 import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
-import { stripHtml } from '../utils/text';
+import { AI_GENERAL_LABEL, normalizeAiSteps, normalizeAiText, stripHtml } from '../utils/text';
 import { useAuth } from '../contexts/AuthContext';
 import { jsPDF } from 'jspdf';
 import Footer from '../components/Footer';
@@ -615,24 +615,24 @@ function Dashboard() {
           yPosition = 20;
         }
 
-        const title = stripHtml(item.title || `解析 ${index + 1}`);
+        const title = normalizeAiText(item.title || `解析 ${index + 1}`);
         pdf.setFontSize(12);
         pdf.text(`${index + 1}. ${title}`, 20, yPosition);
         yPosition += 8;
 
         pdf.setFontSize(10);
-        const summaryText = stripHtml(item.summary || '');
+        const summaryText = normalizeAiText(item.summary || '');
         const summaryLines = pdf.splitTextToSize(`概要: ${summaryText}`, pageWidth - 50);
         pdf.text(summaryLines, 25, yPosition);
         yPosition += summaryLines.length * 4 + 4;
 
-        const impactText = stripHtml(item.impact || '');
+        const impactText = normalizeAiText(item.impact || '');
         const impactLines = pdf.splitTextToSize(`影響: ${impactText}`, pageWidth - 50);
         pdf.text(impactLines, 25, yPosition);
         yPosition += impactLines.length * 4 + 4;
 
         const stepsText = item.steps && item.steps.length > 0
-          ? item.steps.map((step) => stripHtml(step)).join(' / ')
+          ? normalizeAiSteps(item.steps).join(' / ')
           : '';
         const stepsLines = pdf.splitTextToSize(`対策: ${stepsText}`, pageWidth - 50);
         pdf.text(stepsLines, 25, yPosition);
@@ -668,12 +668,12 @@ function Dashboard() {
     ? completedAdvice.map((item) => {
         const vuln = vulnById.get(item.vulnId);
         const description = item.summary
-          ? stripHtml(item.summary)
+          ? normalizeAiText(item.summary)
           : aiMissingSummaryText;
         const impact = item.impact
-          ? stripHtml(item.impact)
+          ? normalizeAiText(item.impact)
           : aiMissingImpactText;
-        const title = item.title ? stripHtml(item.title) : '脆弱性の改善案';
+        const title = item.title ? normalizeAiText(item.title) : '脆弱性の改善案';
         return {
           priority: getPriorityFromSeverity(vuln?.severity),
           title,
@@ -690,17 +690,17 @@ function Dashboard() {
   const mostCriticalStatus: AISummaryStatus = mostCriticalAdvice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');
   const mostCriticalTitle = mostCritical
     ? (mostCriticalAdvice?.title
-        ? stripHtml(mostCriticalAdvice.title)
+        ? normalizeAiText(mostCriticalAdvice.title)
         : (mostCritical.type || getAiStatusLabel(mostCriticalStatus)))
     : '';
   const mostCriticalSummary = mostCritical
     ? (mostCriticalStatus === 'completed'
-        ? (mostCriticalAdvice?.summary ? stripHtml(mostCriticalAdvice.summary) : aiMissingSummaryText)
+        ? (mostCriticalAdvice?.summary ? normalizeAiText(mostCriticalAdvice.summary) : aiMissingSummaryText)
         : getAiStatusMessage(mostCriticalStatus))
     : '';
   const mostCriticalImpact = mostCritical
     ? (mostCriticalStatus === 'completed'
-        ? (mostCriticalAdvice?.impact ? stripHtml(mostCriticalAdvice.impact) : aiMissingImpactText)
+        ? (mostCriticalAdvice?.impact ? normalizeAiText(mostCriticalAdvice.impact) : aiMissingImpactText)
         : '')
     : '';
 
@@ -940,16 +940,16 @@ function Dashboard() {
                   const status = advice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');
                   const statusMessage = getAiStatusMessage(status);
                   const title = advice?.title
-                    ? stripHtml(advice.title)
+                    ? normalizeAiText(advice.title)
                     : (vuln.type || '脆弱性項目');
                   const description = status === 'completed'
-                    ? (advice?.summary ? stripHtml(advice.summary) : aiMissingSummaryText)
+                    ? (advice?.summary ? normalizeAiText(advice.summary) : aiMissingSummaryText)
                     : statusMessage;
                   const impact = status === 'completed'
-                    ? (advice?.impact ? stripHtml(advice.impact) : aiMissingImpactText)
+                    ? (advice?.impact ? normalizeAiText(advice.impact) : aiMissingImpactText)
                     : statusMessage;
                   const steps = status === 'completed' && Array.isArray(advice?.steps)
-                    ? advice.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
+                    ? normalizeAiSteps(advice.steps)
                     : [];
                   const solutionText = status === 'completed'
                     ? (steps.length > 0 ? steps.join(' / ') : aiMissingStepsText)
@@ -992,6 +992,9 @@ function Dashboard() {
                         <span className="text-sm text-gray-600">ポート {vuln.port}</span>
                       </div>
 
+                      {status === 'completed' && (
+                        <p className="text-xs text-gray-500 mb-2">{AI_GENERAL_LABEL}</p>
+                      )}
                       <p className="text-gray-700 mb-3">{description}</p>
                       {status === 'failed' && advice?.error_reason && (
                         <p className="text-xs text-red-600 mb-2">失敗理由: {stripHtml(advice.error_reason)}</p>
@@ -1199,18 +1202,18 @@ function Dashboard() {
                   const status = advice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');
                   const statusMessage = getAiStatusMessage(status);
                   const title = advice?.title
-                    ? stripHtml(advice.title)
+                    ? normalizeAiText(advice.title)
                     : (vuln.type || '脆弱性項目');
                   const summary = status === 'completed'
-                    ? (advice?.summary ? stripHtml(advice.summary) : aiMissingSummaryText)
+                    ? (advice?.summary ? normalizeAiText(advice.summary) : aiMissingSummaryText)
                     : statusMessage;
                   const impact = status === 'completed'
-                    ? (advice?.impact ? stripHtml(advice.impact) : aiMissingImpactText)
+                    ? (advice?.impact ? normalizeAiText(advice.impact) : aiMissingImpactText)
                     : statusMessage;
                   const steps = status === 'completed' && Array.isArray(advice?.steps)
-                    ? advice.steps.map((step) => stripHtml(step)).filter((step) => step.length > 0)
+                    ? normalizeAiSteps(advice.steps)
                     : [];
-                  const analogyFromAi = status === 'completed' && advice?.analogy ? stripHtml(advice.analogy) : '';
+                  const analogyFromAi = status === 'completed' && advice?.analogy ? normalizeAiText(advice.analogy) : '';
                   const analogy = status === 'completed' ? (analogyFromAi || getFallbackAnalogy(vuln.type)) : '';
 
                   return (
@@ -1225,6 +1228,9 @@ function Dashboard() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       <div>
                         <h5 className="font-semibold text-gray-900 mb-3">技術的解説</h5>
+                        {status === 'completed' && (
+                          <p className="text-xs text-gray-500 mb-2">{AI_GENERAL_LABEL}</p>
+                        )}
                         <p className="text-gray-700 mb-4">{summary}</p>
                         <p className="text-gray-700"><strong>影響:</strong> {impact}</p>
                       </div>

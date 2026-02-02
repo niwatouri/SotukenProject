@@ -2,6 +2,7 @@
 import httpx
 import json
 import logging
+import re
 import time
 from typing import Any, Dict, Optional
 
@@ -30,6 +31,14 @@ from app.scan_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+AI_TECH_TERM_REPLACEMENTS: list[tuple[str, str]] = [
+    (r"\bJDBC\b", "DB接続"),
+    (r"\bPreparedStatement\b", "プレースホルダ/バインド変数"),
+    (r"\bCallableStatement\b", "ストアドプロシージャ呼び出し"),
+    (r"\bJPA\b", "ORM"),
+    (r"\bHibernate\b", "ORM"),
+]
 
 # AI要約タスク用のキュー（default）
 redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
@@ -156,6 +165,26 @@ def _normalize_ai_steps(steps: Any) -> Optional[list[str]]:
     return [str(step) for step in steps if step is not None]
 
 
+def _sanitize_ai_text(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value)
+    for pattern, replacement in AI_TECH_TERM_REPLACEMENTS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    return text.strip()
+
+
+def _sanitize_ai_steps(steps: Optional[list[str]]) -> Optional[list[str]]:
+    if not steps:
+        return steps
+    sanitized = []
+    for step in steps:
+        text = _sanitize_ai_text(step)
+        if text:
+            sanitized.append(text)
+    return sanitized
+
+
 def _call_ai_for_vulnerability(vulnerability: Dict[str, Any]) -> Dict[str, Any]:
     if not OPENAI_API_KEY or not OPENAI_API_KEY.strip():
         raise RuntimeError("OPENAI_API_KEY is not configured")
@@ -164,13 +193,24 @@ def _call_ai_for_vulnerability(vulnerability: Dict[str, Any]) -> Dict[str, Any]:
     system_message = (
         "あなたはセキュリティアナリストです。入力された脆弱性に対して、"
         "日本語で分かりやすい解説と改善アドバイスを生成してください。"
+        "特定言語・特定フレームワーク・特定ライブラリ・特定製品名は出さず、"
+        "技術非依存の一般的な対策のみを書いてください。"
+        "禁止語: JDBC, PreparedStatement, CallableStatement, JPA, Hibernate。"
+        "SQLi対策は「プレースホルダ/バインド変数」「ORMの安全API」「入力値の型チェック/バリデーション」"
+        "「DB最小権限」「エラーメッセージ抑制」「WAFは補助」を優先して使ってください。"
+        "XSS対策は「出力エスケープ」「テンプレートエンジンの自動エスケープ」"
+        "「CSP」「HttpOnly/SameSite」「入力検証は補助（本質は出力）」を優先して使ってください。"
+        "まず確認すべきことを1〜2行書き、その後に対策を列挙してください。"
+        "冗長にせず、各項目は6〜12行程度に収めてください。"
         "出力はJSONのみで、余計な説明やMarkdownは不要です。"
     )
     user_message = (
         "以下の脆弱性に対して、必ず1件のitemsを返してください。\n"
         "出力形式:\n"
         '{"items":[{"vulnId":"<id>","title":"短いタイトル","summary":"概要(1-2文)",'
-        '"impact":"影響","steps":["対策手順1","対策手順2"],"analogy":"わかりやすい例え"}]}\n'
+        '"impact":"影響(1-2文)","steps":["確認: ...","確認: ...","対策: ...","対策: ..."],'
+        '"analogy":"わかりやすい例え"}]}\n'
+        "stepsは4〜8件。最初の1〜2件は「確認:」で始め、残りは「対策:」で始めてください。\n"
         "vulnIdは入力のidをそのまま使用してください。\n"
         "脆弱性:\n"
         f"{payload}"
@@ -265,15 +305,16 @@ def ai_summary_task(scan_id: int, target_alert_key: Optional[str] = None) -> Non
             upsert_ai_summary(scan_id, alert_key, status="processing")
             item = _call_ai_for_vulnerability(vulnerability)
             steps = _normalize_ai_steps(item.get("steps"))
+            steps = _sanitize_ai_steps(steps)
             upsert_ai_summary(
                 scan_id,
                 alert_key,
                 status="completed",
-                title=item.get("title"),
-                summary=item.get("summary"),
-                impact=item.get("impact"),
+                title=_sanitize_ai_text(item.get("title")),
+                summary=_sanitize_ai_text(item.get("summary")),
+                impact=_sanitize_ai_text(item.get("impact")),
                 steps=steps,
-                analogy=item.get("analogy"),
+                analogy=_sanitize_ai_text(item.get("analogy")),
             )
         except Exception as exc:
             reason = str(exc)
