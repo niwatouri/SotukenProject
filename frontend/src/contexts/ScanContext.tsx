@@ -296,8 +296,6 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
         setScanId(responseScanId);
       }
 
-      console.log('✅ スキャンジョブ投入:', jobId);
-
       const maxWaitMs = 60 * 60 * 1000; // 60分まで待機
       const pollIntervalMs = 5000;
       const bumpProgress = (value: number) => {

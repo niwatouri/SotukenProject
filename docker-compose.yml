@@ -164,28 +164,6 @@ services:
     networks:
       - zapnet
 
-  # AI解析
-  ai:
-    build:
-      context: ./ai
-      dockerfile: Dockerfile
-    container_name: zap-ai
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL}
-      - REPORT_PATHS=/reports/zap_report_*.json,/reports/zap_report_*.xml,/reports/zap_report_*.html
-      - WAIT_TIMEOUT=${WAIT_TIMEOUT:-300}
-      - POLL_INTERVAL=${POLL_INTERVAL:-5}
-      - AI_JSON_PATH=/reports/ai_advice.json
-      - AI_TXT_PATH=/reports/ai_advice.txt
-    volumes:
-      - ./reports:/reports
-    depends_on:
-      zap-scanner:
-        condition: service_healthy
-    networks:
-      - zapnet
-
 volumes:
   postgres-data:
   login-node-modules:

@@ -77,20 +77,6 @@ def _verify_token(token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Invalid token") from exc
 
 
-def _fetch_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, email
-                FROM users
-                WHERE id = %s
-                """,
-                (user_id,),
-            )
-            return cur.fetchone()
-
-
 def _fetch_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -292,25 +278,6 @@ def _fetch_scans(user_id: int, limit: int, offset: int) -> list[Dict[str, Any]]:
             return cur.fetchall()
 
 
-def _fetch_latest_report(user_id: int) -> Optional[Dict[str, Any]]:
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT parsed_report
-                FROM scans
-                WHERE user_id = %s
-                  AND status = 'finished'
-                  AND parsed_report IS NOT NULL
-                ORDER BY created_at DESC
-                LIMIT 1
-                """,
-                (user_id,),
-            )
-            row = cur.fetchone()
-            return row["parsed_report"] if row else None
-
-
 def _fetch_latest_scan(user_id: int) -> Optional[Dict[str, Any]]:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -343,19 +310,6 @@ def _update_scan_progress(scan_id: int, progress_percent: int) -> None:
                 """,
                 (progress_percent, scan_id),
             )
-
-
-# --- レポート取得 ---
-@app.get("/report")
-def get_report(user: Dict[str, Any] = Depends(require_auth)):
-    user_id = user.get("userId")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid user payload")
-
-    latest_report = _fetch_latest_report(user_id)
-    if latest_report is None:
-        raise HTTPException(status_code=404, detail="Report not found")
-    return latest_report
 
 
 @app.get("/scans")
