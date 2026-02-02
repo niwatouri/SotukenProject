@@ -113,6 +113,39 @@ const getFallbackAnalogy = (vulnType: string) => {
   }
 };
 
+const getConfidenceLabel = (confidence?: 'high' | 'medium' | 'low' | null) => {
+  switch (confidence) {
+    case 'high':
+      return 'High';
+    case 'medium':
+      return 'Medium';
+    case 'low':
+      return 'Low';
+    default:
+      return '未取得';
+  }
+};
+
+const getConfidenceTone = (confidence?: string | null) => {
+  switch (confidence) {
+    case 'high':
+      return 'bg-red-100 text-red-700';
+    case 'medium':
+      return 'bg-yellow-100 text-yellow-700';
+    case 'low':
+      return 'bg-green-100 text-green-700';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
+};
+
+const trimSnippet = (snippet?: string[] | null) => {
+  if (!Array.isArray(snippet)) {
+    return [];
+  }
+  return snippet.slice(0, 10).map((line) => (line.length > 200 ? `${line.slice(0, 199)}…` : line));
+};
+
 function Dashboard() {
   const { scanResults, loadScanById, loadScanHistory } = useScan();
   const { logout, user } = useAuth();
@@ -791,6 +824,20 @@ function Dashboard() {
                   const solutionText = hasAiAdvice
                     ? (steps.length > 0 ? steps.join(' / ') : aiMissingStepsText)
                     : aiPlaceholderText;
+                  const evidence = vuln.evidence;
+                  const hasEvidence = !!(evidence && (
+                    evidence.affected_url ||
+                    evidence.path ||
+                    evidence.parameter ||
+                    evidence.confidence ||
+                    evidence.rationale ||
+                    evidence.reproduction ||
+                    (evidence.request_snippet && evidence.request_snippet.length > 0) ||
+                    (evidence.response_snippet && evidence.response_snippet.length > 0)
+                  ));
+                  const requestSnippet = trimSnippet(evidence?.request_snippet);
+                  const responseSnippet = trimSnippet(evidence?.response_snippet);
+                  const showSnippet = requestSnippet.length > 0 || responseSnippet.length > 0;
 
                   return (
                     <div key={`${vuln.id}-${index}`} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -823,6 +870,67 @@ function Dashboard() {
                           <p className="font-medium text-gray-900 mb-1">対策:</p>
                           <p className="text-gray-600">{solutionText}</p>
                         </div>
+                      </div>
+
+                      <div className="mt-4 border-t border-gray-100 pt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="font-medium text-gray-900">証拠</p>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getConfidenceTone(evidence?.confidence ?? null)}`}>
+                            確度: {getConfidenceLabel(evidence?.confidence ?? null)}
+                          </span>
+                        </div>
+                        {!hasEvidence && (
+                          <p className="text-sm text-gray-500">証拠情報：未取得（次回スキャンで取得予定）</p>
+                        )}
+                        {hasEvidence && (
+                          <div className="space-y-3 text-sm text-gray-700">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">該当URL</p>
+                                <p className="font-medium text-gray-900">{evidence?.affected_url || '未取得'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">パス</p>
+                                <p className="font-medium text-gray-900">{evidence?.path || '未取得'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">パラメータ</p>
+                                <p className="font-medium text-gray-900">{evidence?.parameter || '未取得'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">メソッド</p>
+                                <p className="font-medium text-gray-900">{evidence?.method || '未取得'}</p>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 mb-1">根拠</p>
+                              <p className="text-gray-700">{evidence?.rationale || '未取得'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 mb-1">再現手順</p>
+                              <p className="text-gray-700">{evidence?.reproduction || '未取得'}</p>
+                            </div>
+                            {showSnippet && (
+                              <details className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                                <summary className="cursor-pointer text-sm font-medium text-gray-700">詳細（リクエスト/レスポンス抜粋）</summary>
+                                <div className="mt-2 space-y-3 text-xs text-gray-700">
+                                  {requestSnippet.length > 0 && (
+                                    <div>
+                                      <p className="font-medium text-gray-600 mb-1">Request</p>
+                                      <pre className="whitespace-pre-wrap break-words">{requestSnippet.join('\n')}</pre>
+                                    </div>
+                                  )}
+                                  {responseSnippet.length > 0 && (
+                                    <div>
+                                      <p className="font-medium text-gray-600 mb-1">Response</p>
+                                      <pre className="whitespace-pre-wrap break-words">{responseSnippet.join('\n')}</pre>
+                                    </div>
+                                  )}
+                                </div>
+                              </details>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

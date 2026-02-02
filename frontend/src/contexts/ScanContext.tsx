@@ -12,6 +12,17 @@ export interface VulnerabilityData {
   impact: string;
   solution: string;
   cveId?: string;
+  evidence?: {
+    affected_url?: string | null;
+    path?: string | null;
+    parameter?: string | null;
+    method?: string | null;
+    confidence?: 'high' | 'medium' | 'low' | null;
+    rationale?: string | null;
+    reproduction?: string | null;
+    request_snippet?: string[] | null;
+    response_snippet?: string[] | null;
+  };
 }
 
 export interface ScanResults {
@@ -91,11 +102,33 @@ const isValidScanResults = (data: any): data is ScanResults => {
     typeof data.riskScore === 'number';
 };
 
+const sanitizeEvidence = (evidence?: VulnerabilityData['evidence']): VulnerabilityData['evidence'] => {
+  if (!evidence) {
+    return evidence;
+  }
+  return {
+    ...evidence,
+    affected_url: evidence.affected_url ? stripHtml(evidence.affected_url) : evidence.affected_url,
+    path: evidence.path ? stripHtml(evidence.path) : evidence.path,
+    parameter: evidence.parameter ? stripHtml(evidence.parameter) : evidence.parameter,
+    method: evidence.method ? stripHtml(evidence.method) : evidence.method,
+    rationale: evidence.rationale ? stripHtml(evidence.rationale) : evidence.rationale,
+    reproduction: evidence.reproduction ? stripHtml(evidence.reproduction) : evidence.reproduction,
+    request_snippet: Array.isArray(evidence.request_snippet)
+      ? evidence.request_snippet.map((line) => stripHtml(line))
+      : evidence.request_snippet,
+    response_snippet: Array.isArray(evidence.response_snippet)
+      ? evidence.response_snippet.map((line) => stripHtml(line))
+      : evidence.response_snippet,
+  };
+};
+
 const sanitizeVulnerability = (vulnerability: VulnerabilityData): VulnerabilityData => ({
   ...vulnerability,
   description: stripHtml(vulnerability.description || ''),
   impact: stripHtml(vulnerability.impact || ''),
   solution: stripHtml(vulnerability.solution || ''),
+  evidence: sanitizeEvidence(vulnerability.evidence),
 });
 
 const sanitizeScanResults = (results: ScanResults): ScanResults => ({
