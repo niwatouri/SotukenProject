@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Shield, AlertTriangle, Activity, Globe, Download, Brain, Home, Clock, Target, BarChart3, CheckCircle, Lightbulb } from 'lucide-react';
 import { ScanHistoryItem, useScan, VulnerabilityData } from '../contexts/ScanContext';
 import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
@@ -535,12 +535,6 @@ function Dashboard() {
   }, {} as Record<string, number>);
   const totalVulnerabilities = scanResults.vulnerabilities.length;
 
-  const chartData = Object.entries(severityCounts).map(([severity, count]) => ({
-    severity: getSeverityLabel(severity),
-    count,
-    color: severityColors[severity as keyof typeof severityColors]
-  }));
-
   const pieData = Object.entries(severityCounts).map(([severity, count]) => ({
     name: getSeverityLabel(severity),
     value: count,
@@ -898,20 +892,7 @@ function Dashboard() {
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">脆弱性の重要度別分布</h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="severity" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#3B82F6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              
+            <div className="grid grid-cols-1 gap-8 mb-8">
               <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">リスク分布</h3>
                 <ResponsiveContainer width="100%" height={250}>
