@@ -568,45 +568,67 @@ function Dashboard() {
     const pageWidth = pdf.internal.pageSize.width;
     const pageHeight = pdf.internal.pageSize.height;
     const marginX = 18;
-    const marginY = 18;
+    const marginY = 16;
     const contentWidth = pageWidth - marginX * 2;
     let yPosition = marginY;
 
-    const lineHeightFor = (fontSize: number) => Math.max(4, fontSize * 0.35 + 1);
+    const fontSizes = {
+      h1: 17,
+      h2: 13.5,
+      h3: 11.5,
+      body: 10.5,
+      small: 9,
+    };
+    const lineHeightFor = (fontSize: number) => Math.max(4, fontSize * 0.55);
+    const setBodyFont = (fontSize: number) => {
+      pdf.setFont(PDF_FONT_NAME, 'normal');
+      pdf.setFontSize(fontSize);
+    };
     const ensureSpace = (height: number) => {
       if (yPosition + height > pageHeight - marginY) {
         pdf.addPage();
         yPosition = marginY;
       }
     };
+    const addSpacer = (height: number) => {
+      ensureSpace(height);
+      yPosition += height;
+    };
+    const getLines = (text: string, fontSize: number, width: number) => {
+      setBodyFont(fontSize);
+      return pdf.splitTextToSize(text, width);
+    };
     const addLines = (lines: string[], fontSize: number, indent = 0, gap = 0) => {
       const lineHeight = lineHeightFor(fontSize);
       ensureSpace(lines.length * lineHeight + gap);
-      pdf.setFontSize(fontSize);
+      setBodyFont(fontSize);
       pdf.text(lines, marginX + indent, yPosition);
       yPosition += lines.length * lineHeight + gap;
     };
-    const addParagraph = (text: string, fontSize = 10, indent = 0, gap = 0) => {
-      const lines = pdf.splitTextToSize(text, contentWidth - indent);
+    const addParagraph = (text: string, fontSize = fontSizes.body, indent = 0, gap = 2) => {
+      const lines = getLines(text, fontSize, contentWidth - indent);
       addLines(lines, fontSize, indent, gap);
     };
     const addCenteredTitle = (text: string) => {
-      const fontSize = 18;
+      const fontSize = fontSizes.h1;
+      const lines = getLines(text, fontSize, contentWidth);
       const lineHeight = lineHeightFor(fontSize);
-      ensureSpace(lineHeight + 4);
-      pdf.setFontSize(fontSize);
-      pdf.text(text, pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += lineHeight + 4;
+      ensureSpace(lines.length * lineHeight + 6);
+      setBodyFont(fontSize);
+      lines.forEach((line, index) => {
+        pdf.text(line, pageWidth / 2, yPosition + index * lineHeight, { align: 'center' });
+      });
+      yPosition += lines.length * lineHeight + 6;
     };
     const addSectionTitle = (text: string) => {
-      addParagraph(text, 13, 0, 3);
+      addParagraph(text, fontSizes.h2, 0, 4);
     };
     const addSubTitle = (text: string) => {
-      addParagraph(text, 11, 0, 2);
+      addParagraph(text, fontSizes.h3, 0, 3);
     };
     const addDivider = () => {
       ensureSpace(3);
-      pdf.setDrawColor(220);
+      pdf.setDrawColor(200);
       pdf.line(marginX, yPosition, pageWidth - marginX, yPosition);
       yPosition += 4;
     };
@@ -617,6 +639,68 @@ function Dashboard() {
       return masked;
     };
     const maskSnippet = (lines: string[]) => lines.map((line) => maskSensitiveLine(line));
+    const shortenText = (value: string, maxLength: number) => {
+      if (!value) {
+        return '未取得';
+      }
+      const compact = value.replace(/^https?:\/\//, '');
+      if (compact.length <= maxLength) {
+        return compact;
+      }
+      return `${compact.slice(0, maxLength - 1)}…`;
+    };
+    const estimateParagraphHeight = (text: string, fontSize = fontSizes.body, indent = 0) => {
+      const lines = getLines(text, fontSize, contentWidth - indent);
+      return lines.length * lineHeightFor(fontSize);
+    };
+    const drawTable = (
+      rows: Array<Array<string>>,
+      columnWidths: number[],
+      fontSize = fontSizes.body,
+      rowGap = 0,
+    ) => {
+      const padding = 2;
+      const lineHeight = lineHeightFor(fontSize);
+      pdf.setDrawColor(190);
+      rows.forEach((row) => {
+        setBodyFont(fontSize);
+        const cellLines = row.map((cell, index) => getLines(cell, fontSize, columnWidths[index] - padding * 2));
+        const maxLines = Math.max(...cellLines.map((lines) => lines.length));
+        const rowHeight = maxLines * lineHeight + padding * 2;
+        ensureSpace(rowHeight + rowGap);
+        let x = marginX;
+        cellLines.forEach((lines, index) => {
+          const width = columnWidths[index];
+          pdf.rect(x, yPosition, width, rowHeight);
+          pdf.text(lines, x + padding, yPosition + padding + lineHeight);
+          x += width;
+        });
+        yPosition += rowHeight + rowGap;
+      });
+    };
+    const addCodeBlock = (label: string, lines: string[], maxLines = 10) => {
+      const trimmed = lines.slice(0, maxLines);
+      const shouldTruncate = lines.length > maxLines;
+      const outputLines = shouldTruncate ? [...trimmed, '…省略'] : trimmed;
+      if (outputLines.length === 0) {
+        addParagraph(`${label}: 未取得`, fontSizes.small, 0, 2);
+        return;
+      }
+      const labelHeight = lineHeightFor(fontSizes.body);
+      const fontSize = fontSizes.small;
+      const lineHeight = lineHeightFor(fontSize);
+      const padding = 2;
+      const blockHeight = outputLines.length * lineHeight + padding * 2;
+      ensureSpace(labelHeight + blockHeight + 3);
+      addParagraph(label, fontSizes.body, 0, 1);
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(fontSize);
+      pdf.setDrawColor(180);
+      pdf.rect(marginX, yPosition, contentWidth, blockHeight);
+      pdf.text(outputLines, marginX + padding, yPosition + padding + lineHeight);
+      yPosition += blockHeight + 3;
+      setBodyFont(fontSizes.body);
+    };
 
     const criticalCount = Number(severityCounts.critical || 0);
     const highCount = Number(severityCounts.high || 0);
@@ -670,33 +754,73 @@ function Dashboard() {
     };
 
     addCenteredTitle('SecureGuard 脆弱性レポート');
-    addParagraph(`対象URL: ${scanResults.targetUrl}`);
-    addParagraph(`スキャン実行日時: ${new Date(scanResults.timestamp).toLocaleString('ja-JP')}`);
-    addParagraph(`スキャンタイプ: ${scanTypeLabel}`);
-    addParagraph(`検出された脆弱性（合計）: ${totalVulnerabilities}件`);
-    addParagraph(`開放ポート（合計）: ${openPortsCount}件`);
-    addParagraph(`開放ポート一覧: ${openPortsText}`);
+    addSectionTitle('基本情報');
+    drawTable(
+      [
+        ['対象URL', scanResults.targetUrl],
+        ['スキャン実行日時', new Date(scanResults.timestamp).toLocaleString('ja-JP')],
+        ['スキャンタイプ', scanTypeLabel],
+        ['検出された脆弱性（合計）', `${totalVulnerabilities}件`],
+        ['開放ポート（合計）', `${openPortsCount}件`],
+        ['開放ポート一覧', openPortsText],
+      ],
+      [40, contentWidth - 40],
+      fontSizes.body,
+      1,
+    );
     if (stoppedByTimeout) {
-      addParagraph('※時間上限で停止: タイムボックスに達したためスキャンを停止しました。');
+      addParagraph('※時間上限で停止: タイムボックスに達したためスキャンを停止しました。', fontSizes.small, 0, 2);
     }
-    addDivider();
 
     addSectionTitle('サマリー');
-    addParagraph(`脆弱性検出数: ${totalVulnerabilities}件`);
-    addParagraph(`開放ポート数: ${openPortsCount}件`);
-    addParagraph(`中以上のリスク件数: ${midPlusCount}件（High+Medium、CriticalはHighに含む）`);
-    addParagraph(
-      `重要度分布: Critical=${criticalCount}, High=${highCount}, Medium=${mediumCount}, Low=${lowCount}, Info=${infoCount}（合計${totalVulnerabilities}）`,
+    drawTable(
+      [
+        ['脆弱性検出数', `${totalVulnerabilities}件`],
+        ['開放ポート数', `${openPortsCount}件`],
+        ['中以上のリスク件数', `${midPlusCount}件（High+Medium、CriticalはHighに含む）`],
+        [
+          '重要度分布',
+          `Critical=${criticalCount}, High=${highCount}, Medium=${mediumCount}, Low=${lowCount}, Info=${infoCount}（合計${totalVulnerabilities}）`,
+        ],
+      ],
+      [40, contentWidth - 40],
+      fontSizes.body,
+      1,
     );
     if (totalVulnerabilities === 0) {
       addParagraph('検出された脆弱性はありません。');
     }
     addDivider();
 
-    addSectionTitle('検出された脆弱性（証拠付き）');
+    pdf.addPage();
+    yPosition = marginY;
+    addSectionTitle('検出された脆弱性一覧');
     if (scanResults.vulnerabilities.length === 0) {
       addParagraph('検出結果がありません。');
+    } else {
+      const header = ['No', '脆弱性名', '重要度', 'ポート', '確度', '該当URL', 'AI解析'];
+      const rows = scanResults.vulnerabilities.map((vuln, index) => {
+        const alertKey = vuln.alertKey ?? vuln.id;
+        const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
+        const status = normalizeAiStatus(advice?.status);
+        const evidence = vuln.evidence;
+        const url = evidence?.affected_url || scanResults.targetUrl;
+        return [
+          String(index + 1),
+          normalizeAiText(advice?.title || vuln.type || '脆弱性項目'),
+          getSeverityLabel(vuln.severity),
+          String(vuln.port ?? '-'),
+          getConfidenceLabel(evidence?.confidence ?? null),
+          shortenText(url || '未取得', 38),
+          getAiStatusLabel(status),
+        ];
+      });
+      const columnWidths = [10, 52, 18, 12, 18, 46, 18];
+      drawTable([header, ...rows], columnWidths, fontSizes.small, 0.5);
     }
+
+    addSpacer(4);
+    addSectionTitle('脆弱性詳細');
     scanResults.vulnerabilities.forEach((vuln, index) => {
       const alertKey = vuln.alertKey ?? vuln.id;
       const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
@@ -714,63 +838,103 @@ function Dashboard() {
       const aiSteps = status === 'completed' && Array.isArray(advice?.steps)
         ? normalizeAiSteps(advice.steps)
         : [];
-      let mitigationSteps = aiSteps.length > 0 ? aiSteps : getFallbackMitigations(vuln.type || '');
+      const confirmedSteps = aiSteps
+        .filter((step) => step.startsWith('確認:'))
+        .map((step) => step.replace(/^確認:\s*/, '').trim())
+        .filter(Boolean)
+        .slice(0, 3);
+      let mitigationSteps = aiSteps
+        .filter((step) => step.startsWith('対策:'))
+        .map((step) => step.replace(/^対策:\s*/, '').trim())
+        .filter(Boolean);
+      if (mitigationSteps.length === 0) {
+        mitigationSteps = aiSteps
+          .filter((step) => !step.startsWith('確認:'))
+          .map((step) => step.replace(/^対策:\s*/, '').trim())
+          .filter(Boolean);
+      }
+      mitigationSteps = mitigationSteps.length > 0 ? mitigationSteps : getFallbackMitigations(vuln.type || '');
       if (mitigationSteps.length < 4) {
         const padding = getFallbackMitigations('');
         mitigationSteps = [...mitigationSteps, ...padding].slice(0, 6);
       }
+      mitigationSteps = mitigationSteps.slice(0, 6);
       const evidence = vuln.evidence;
-      const requestSnippet = maskSnippet(trimSnippet(evidence?.request_snippet));
-      const responseSnippet = maskSnippet(trimSnippet(evidence?.response_snippet));
+      const requestSource = Array.isArray(evidence?.request_snippet) ? evidence?.request_snippet : [];
+      const responseSource = Array.isArray(evidence?.response_snippet) ? evidence?.response_snippet : [];
+      const requestSnippet = maskSnippet(trimSnippet(requestSource));
+      const responseSnippet = maskSnippet(trimSnippet(responseSource));
+
+      const blockHeight =
+        estimateParagraphHeight(`${index + 1}. ${title}`, fontSizes.h3) +
+        estimateParagraphHeight(`重要度: ${getSeverityLabel(vuln.severity)} / ポート: ${vuln.port} / AI解析: ${statusLabel}`) +
+        estimateParagraphHeight(`概要: ${summary || '未取得'}`) +
+        estimateParagraphHeight(`影響: ${impact || '未取得'}`) +
+        (mitigationSteps.length + 2) * lineHeightFor(fontSizes.body);
+      ensureSpace(blockHeight);
 
       addSubTitle(`${index + 1}. ${title}`);
-      addParagraph(`重要度: ${getSeverityLabel(vuln.severity)} / ポート: ${vuln.port}`);
-      addParagraph(`AI解析: ${statusLabel}`);
+      addParagraph(`重要度: ${getSeverityLabel(vuln.severity)} / ポート: ${vuln.port} / AI解析: ${statusLabel}`);
       if (status === 'failed' && advice?.error_reason) {
-        addParagraph(`失敗理由: ${normalizeAiText(advice.error_reason)}`, 9);
-      }
-      if (status === 'completed') {
-        addParagraph(AI_GENERAL_LABEL, 8, 0, 2);
+        addParagraph(`失敗理由: ${normalizeAiText(advice.error_reason)}`, fontSizes.small, 0, 2);
       }
       addParagraph(`概要: ${summary || '未取得'}`);
       addParagraph(`影響: ${impact || '未取得'}`);
 
-      addParagraph('対策:');
+      addParagraph('推奨対策:');
       mitigationSteps.forEach((step) => {
-        addParagraph(`・${step}`, 10, 2);
+        addParagraph(`・${step}`, fontSizes.body, 2);
       });
-
-      addParagraph('証拠:');
-      addParagraph(`該当URL: ${evidence?.affected_url || '未取得'}`, 10, 2);
-      addParagraph(`パス: ${evidence?.path || '未取得'}`, 10, 2);
-      addParagraph(`メソッド: ${evidence?.method || '未取得'}`, 10, 2);
-      addParagraph(`パラメータ: ${evidence?.parameter || '未取得'}`, 10, 2);
-      addParagraph(`検出根拠: ${evidence?.rationale || '未取得'}`, 10, 2);
-      addParagraph(`確度: ${getConfidenceLabel(evidence?.confidence ?? null)}`, 10, 2);
-      addParagraph(`再現手順: ${evidence?.reproduction || '未取得'}`, 10, 2);
-
-      addParagraph('抜粋（最大10行）:');
-      if (requestSnippet.length > 0) {
-        addParagraph('リクエスト:', 9, 2);
-        requestSnippet.forEach((line) => addParagraph(line, 9, 6));
-      } else {
-        addParagraph('リクエスト: 未取得', 9, 2);
+      if (confirmedSteps.length > 0) {
+        addParagraph('確認ポイント:');
+        confirmedSteps.forEach((step) => {
+          addParagraph(`・${step}`, fontSizes.body, 2);
+        });
       }
-      if (responseSnippet.length > 0) {
-        addParagraph('レスポンス:', 9, 2);
-        responseSnippet.forEach((line) => addParagraph(line, 9, 6));
-      } else {
-        addParagraph('レスポンス: 未取得', 9, 2);
-      }
+
+      const evidenceRows = [
+        ['該当URL', evidence?.affected_url || '未取得'],
+        ['パス', evidence?.path || '未取得'],
+        ['メソッド', evidence?.method || '未取得'],
+        ['パラメータ', evidence?.parameter || '未取得'],
+        ['検出根拠', evidence?.rationale || '未取得'],
+        ['確度', getConfidenceLabel(evidence?.confidence ?? null)],
+        ['再現手順', evidence?.reproduction || '未取得'],
+      ];
+      const evidenceTableHeight = evidenceRows.reduce((total, row) => {
+        const labelLines = getLines(row[0], fontSizes.small, 30);
+        const valueLines = getLines(row[1], fontSizes.small, contentWidth - 30 - 4);
+        const rowHeight = Math.max(labelLines.length, valueLines.length) * lineHeightFor(fontSizes.small) + 4;
+        return total + rowHeight;
+      }, 0);
+      const snippetHeight =
+        (requestSnippet.length > 0 ? (requestSnippet.length + 2) : 2) * lineHeightFor(fontSizes.small) +
+        (responseSnippet.length > 0 ? (responseSnippet.length + 2) : 2) * lineHeightFor(fontSizes.small) +
+        10;
+      ensureSpace(evidenceTableHeight + snippetHeight + 8);
+
+      addParagraph('Evidence（証拠）', fontSizes.h3, 0, 2);
+      drawTable(evidenceRows, [30, contentWidth - 30], fontSizes.small, 0.5);
+      addParagraph('抜粋（最大10行）', fontSizes.body, 0, 2);
+      addCodeBlock('リクエスト', requestSnippet);
+      addCodeBlock('レスポンス', responseSnippet);
 
       addDivider();
     });
 
     addSectionTitle('AI解析サマリー');
-    addParagraph(`高リスク脆弱性数: ${analysisData.criticalIssues}件`);
-    addParagraph(`中リスク脆弱性数: ${analysisData.mediumIssues}件`);
-    addParagraph(`低リスク脆弱性数: ${lowCount}件`);
-    addParagraph(`情報レベル脆弱性数: ${infoCount}件`);
+    addParagraph(AI_GENERAL_LABEL, fontSizes.small, 0, 2);
+    drawTable(
+      [
+        ['高リスク脆弱性数', `${analysisData.criticalIssues}件`],
+        ['中リスク脆弱性数', `${analysisData.mediumIssues}件`],
+        ['低リスク脆弱性数', `${lowCount}件`],
+        ['情報レベル脆弱性数', `${infoCount}件`],
+      ],
+      [40, contentWidth - 40],
+      fontSizes.body,
+      0.5,
+    );
 
     const riskComment = analysisData.overallRisk === 'high'
       ? '緊急対応が必要です'
@@ -778,8 +942,15 @@ function Dashboard() {
         ? '早期対応を推奨します'
         : '継続的な監視が必要です';
     addSectionTitle('リスク評価');
-    addParagraph(`総合リスクレベル: ${overallRiskLabel}`);
-    addParagraph(`コメント: ${riskComment}`);
+    drawTable(
+      [
+        ['総合リスクレベル', overallRiskLabel],
+        ['コメント', riskComment],
+      ],
+      [40, contentWidth - 40],
+      fontSizes.body,
+      0.5,
+    );
 
     addSectionTitle('最優先対応項目');
     if (mostCritical) {
@@ -793,7 +964,6 @@ function Dashboard() {
     }
 
     addSectionTitle('AI推奨改善策');
-    addParagraph(AI_GENERAL_LABEL, 8, 0, 2);
     if (recommendations.length === 0) {
       addParagraph('推奨改善策は未取得です。');
     }
@@ -826,14 +996,11 @@ function Dashboard() {
 
       addSubTitle(`${index + 1}. ${title}`);
       addParagraph(`AI解析: ${statusLabel}`);
-      if (status === 'completed') {
-        addParagraph(AI_GENERAL_LABEL, 8, 0, 2);
-      }
       addParagraph(`技術的解説: ${summary || '未取得'}`);
       addParagraph(`影響: ${impact || '未取得'}`);
       if (steps.length > 0) {
         addParagraph('改善案:');
-        steps.forEach((step) => addParagraph(`・${step}`, 10, 2));
+        steps.forEach((step) => addParagraph(`・${step}`, fontSizes.body, 2));
       } else {
         addParagraph('改善案: 未取得');
       }
@@ -844,6 +1011,13 @@ function Dashboard() {
     });
     if (scanResults.vulnerabilities.length > detailTargets.length) {
       addParagraph('※詳細分析は上位3件を掲載しています。');
+    }
+
+    const totalPages = pdf.internal.getNumberOfPages();
+    setBodyFont(fontSizes.small);
+    for (let page = 1; page <= totalPages; page += 1) {
+      pdf.setPage(page);
+      pdf.text(`${page}/${totalPages}`, pageWidth - marginX, pageHeight - 8, { align: 'right' });
     }
 
     pdf.save(`secureguard-report-${new Date().toISOString().split('T')[0]}.pdf`);
