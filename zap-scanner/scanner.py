@@ -90,6 +90,25 @@ def _normalize_scan_types(scan_types):
     return normalized
 
 
+def _normalize_bool(value, fallback=False):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes", "on"}:
+            return True
+        if lowered in {"false", "0", "no", "off"}:
+            return False
+    return fallback
+
+
+def _normalize_int(value, fallback):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
 def _parse_port_scan_ports():
     if not PORT_SCAN_PORTS:
         return DEFAULT_PORT_SCAN_PORTS
@@ -245,22 +264,37 @@ def _safe_set_option(target, method_name, value):
         return False
 
 
-def _apply_spider_options():
-    _safe_set_option(zap.spider, "set_option_max_duration", SPIDER_MAX_DURATION_MINUTES)
-    _safe_set_option(zap.spider, "set_option_max_depth", SPIDER_MAX_DEPTH)
-    _safe_set_option(zap.spider, "set_option_max_children", SPIDER_MAX_CHILDREN)
-    _safe_set_option(zap.spider, "set_option_thread_count", SPIDER_THREAD_COUNT)
+def _apply_spider_options(max_duration_minutes=None, max_depth=None, max_children=None, thread_count=None, delay_ms=None):
+    _safe_set_option(zap.spider, "set_option_max_duration", max_duration_minutes or SPIDER_MAX_DURATION_MINUTES)
+    _safe_set_option(zap.spider, "set_option_max_depth", max_depth or SPIDER_MAX_DEPTH)
+    _safe_set_option(zap.spider, "set_option_max_children", max_children or SPIDER_MAX_CHILDREN)
+    _safe_set_option(zap.spider, "set_option_thread_count", thread_count or SPIDER_THREAD_COUNT)
+    if delay_ms is not None:
+        _safe_set_option(zap.spider, "set_option_delay_in_ms", delay_ms)
 
 
-def _apply_ascan_options():
-    _safe_set_option(zap.ascan, "set_option_max_duration", ASCAN_MAX_DURATION_MINUTES)
-    _safe_set_option(zap.ascan, "set_option_max_scan_duration_in_min", ASCAN_MAX_DURATION_MINUTES)
-    _safe_set_option(zap.ascan, "set_option_max_scan_duration_in_mins", ASCAN_MAX_DURATION_MINUTES)
-    _safe_set_option(zap.ascan, "set_option_max_rule_duration_in_minutes", ASCAN_MAX_RULE_DURATION_MINUTES)
-    _safe_set_option(zap.ascan, "set_option_max_rule_duration_in_mins", ASCAN_MAX_RULE_DURATION_MINUTES)
-    _safe_set_option(zap.ascan, "set_option_max_results_to_list", ASCAN_MAX_RESULTS)
-    _safe_set_option(zap.ascan, "set_option_threads_per_host", ASCAN_THREADS_PER_HOST)
-    _safe_set_option(zap.ascan, "set_option_delay_in_ms", ASCAN_DELAY_IN_MS)
+def _apply_ascan_options(
+    max_duration_minutes=None,
+    max_rule_minutes=None,
+    max_results=None,
+    threads_per_host=None,
+    delay_ms=None,
+    attack_strength=None,
+    alert_threshold=None,
+):
+    max_duration = max_duration_minutes or ASCAN_MAX_DURATION_MINUTES
+    _safe_set_option(zap.ascan, "set_option_max_duration", max_duration)
+    _safe_set_option(zap.ascan, "set_option_max_scan_duration_in_min", max_duration)
+    _safe_set_option(zap.ascan, "set_option_max_scan_duration_in_mins", max_duration)
+    _safe_set_option(zap.ascan, "set_option_max_rule_duration_in_minutes", max_rule_minutes or ASCAN_MAX_RULE_DURATION_MINUTES)
+    _safe_set_option(zap.ascan, "set_option_max_rule_duration_in_mins", max_rule_minutes or ASCAN_MAX_RULE_DURATION_MINUTES)
+    _safe_set_option(zap.ascan, "set_option_max_results_to_list", max_results or ASCAN_MAX_RESULTS)
+    _safe_set_option(zap.ascan, "set_option_threads_per_host", threads_per_host or ASCAN_THREADS_PER_HOST)
+    _safe_set_option(zap.ascan, "set_option_delay_in_ms", delay_ms if delay_ms is not None else ASCAN_DELAY_IN_MS)
+    if attack_strength:
+        _safe_set_option(zap.ascan, "set_option_attack_strength", attack_strength)
+    if alert_threshold:
+        _safe_set_option(zap.ascan, "set_option_alert_threshold", alert_threshold)
 
 
 def _build_context_regex(target_url: str) -> str:
@@ -332,6 +366,29 @@ def _poll_scan_status(
         if status_int >= 100:
             return True, None
         time.sleep(sleep_seconds)
+
+
+def _wait_for_passive_scan(max_seconds, progress_callback=None):
+    start_time = time.time()
+    while True:
+        if max_seconds is not None and (time.time() - start_time) > max_seconds:
+            return False, "パッシブスキャン待機が上限時間に達しました"
+        try:
+            remaining = zap.pscan.records_to_scan()
+        except Exception:
+            return False, "パッシブスキャンの状態取得に失敗しました"
+        try:
+            remaining_int = int(remaining)
+        except (TypeError, ValueError):
+            remaining_int = None
+        if remaining_int is not None and remaining_int <= 0:
+            return True, None
+        if progress_callback:
+            try:
+                progress_callback()
+            except Exception:
+                pass
+        time.sleep(2)
 
 
 def _mark_auth_fallback(auth_status, message):
@@ -549,7 +606,40 @@ def _apply_form_auth(auth, target_url):
     )
 
 
-def _apply_header_auth(header_value):
+def _build_replacer_description(base, suffix):
+    if suffix:
+        return f"{base}-{suffix}"
+    return base
+
+
+def _list_replacer_rules():
+    try:
+        rules_attr = zap.replacer.rules
+        rules = rules_attr(apikey=ZAP_API_KEY) if callable(rules_attr) else rules_attr
+    except Exception:
+        return []
+    if isinstance(rules, dict):
+        rules = rules.get("rules") or rules.get("rule") or rules.get("result")
+    if not isinstance(rules, list):
+        return []
+    return [rule for rule in rules if isinstance(rule, dict)]
+
+
+def _cleanup_replacer_rules(prefix):
+    for rule in _list_replacer_rules():
+        description = str(rule.get("description") or "")
+        if not description.startswith(prefix):
+            continue
+        rule_id = rule.get("ruleId") or rule.get("rule_id") or rule.get("id")
+        if rule_id is None:
+            continue
+        try:
+            zap.replacer.remove_rule(rule_id, apikey=ZAP_API_KEY)
+        except Exception:
+            pass
+
+
+def _apply_header_auth(header_value, rule_suffix=None):
     if not header_value:
         return None, _build_auth_status(
             used=True,
@@ -558,15 +648,24 @@ def _apply_header_auth(header_value):
             message="Authorizationヘッダの値が空です",
         )
 
-    rule_id = zap.replacer.add_rule(
-        description="scan-auth-header",
-        enabled="true",
-        matchtype="REQ_HEADER",
-        matchregex="false",
-        matchstring="Authorization",
-        replacement=header_value,
-        apikey=ZAP_API_KEY,
-    )
+    description = _build_replacer_description("scan-auth-header", rule_suffix)
+    try:
+        rule_id = zap.replacer.add_rule(
+            description=description,
+            enabled="true",
+            matchtype="REQ_HEADER",
+            matchregex="false",
+            matchstring="Authorization",
+            replacement=header_value,
+            apikey=ZAP_API_KEY,
+        )
+    except Exception:
+        return None, _build_auth_status(
+            used=True,
+            method="header",
+            success=False,
+            message="Authorizationヘッダの設定に失敗しました",
+        )
     if isinstance(rule_id, dict):
         rule_id = rule_id.get("ruleId") or rule_id.get("rule_id") or rule_id.get("id")
     return rule_id, _build_auth_status(
@@ -577,7 +676,7 @@ def _apply_header_auth(header_value):
     )
 
 
-def _apply_cookie_auth(cookie_value):
+def _apply_cookie_auth(cookie_value, rule_suffix=None):
     if not cookie_value:
         return None, _build_auth_status(
             used=True,
@@ -586,15 +685,24 @@ def _apply_cookie_auth(cookie_value):
             message="セッションCookieが空です",
         )
 
-    rule_id = zap.replacer.add_rule(
-        description="scan-auth-cookie",
-        enabled="true",
-        matchtype="REQ_HEADER",
-        matchregex="false",
-        matchstring="Cookie",
-        replacement=cookie_value,
-        apikey=ZAP_API_KEY,
-    )
+    description = _build_replacer_description("scan-auth-cookie", rule_suffix)
+    try:
+        rule_id = zap.replacer.add_rule(
+            description=description,
+            enabled="true",
+            matchtype="REQ_HEADER",
+            matchregex="false",
+            matchstring="Cookie",
+            replacement=cookie_value,
+            apikey=ZAP_API_KEY,
+        )
+    except Exception:
+        return None, _build_auth_status(
+            used=True,
+            method="cookie",
+            success=False,
+            message="Cookieヘッダの設定に失敗しました",
+        )
     if isinstance(rule_id, dict):
         rule_id = rule_id.get("ruleId") or rule_id.get("rule_id") or rule_id.get("id")
     return rule_id, _build_auth_status(
@@ -645,9 +753,46 @@ def scan():
     if not target:
         return jsonify({"error": "URL is required"}), 400
 
+    scan_config = data.get("scan_config") if isinstance(data, dict) else None
+    if not isinstance(scan_config, dict):
+        scan_config = {}
+    max_duration_seconds = scan_config.get("max_duration_seconds")
+    max_duration_seconds = _normalize_int(max_duration_seconds, None) if max_duration_seconds is not None else None
+    scope_same_host_only = _normalize_bool(scan_config.get("scope_same_host_only"), True)
+    spider_cfg = scan_config.get("spider") if isinstance(scan_config.get("spider"), dict) else {}
+    active_cfg = scan_config.get("active_scan") if isinstance(scan_config.get("active_scan"), dict) else {}
+    passive_wait_seconds = _normalize_int(scan_config.get("passive_wait_seconds"), 0)
+    rate_cfg = scan_config.get("rate_limit") if isinstance(scan_config.get("rate_limit"), dict) else {}
+    delay_ms = _normalize_int(rate_cfg.get("delay_ms"), None) if rate_cfg else None
+    spider_max_depth = _normalize_int(spider_cfg.get("max_depth"), SPIDER_MAX_DEPTH)
+    spider_max_children = _normalize_int(spider_cfg.get("max_children"), SPIDER_MAX_CHILDREN)
+    spider_max_seconds = _normalize_int(spider_cfg.get("max_duration_seconds"), SPIDER_MAX_DURATION_MINUTES * 60)
+    active_enabled = _normalize_bool(active_cfg.get("enabled"), True)
+    active_max_seconds = _normalize_int(active_cfg.get("max_duration_seconds"), ASCAN_MAX_DURATION_MINUTES * 60)
+    attack_strength = active_cfg.get("attack_strength")
+    alert_threshold = active_cfg.get("alert_threshold")
+
     lock_acquired = SCAN_LOCK.acquire(blocking=False)
     if not lock_acquired:
         return jsonify({"error": "scanner busy"}), 429
+
+    scan_start_time = time.time()
+    stopped_by_timeout = False
+
+    def remaining_seconds():
+        if max_duration_seconds is None:
+            return None
+        return max(0, int(max_duration_seconds - (time.time() - scan_start_time)))
+
+    def timebox_exceeded():
+        if max_duration_seconds is None:
+            return False
+        return (time.time() - scan_start_time) >= max_duration_seconds
+
+    def mark_stopped():
+        nonlocal stopped_by_timeout
+        stopped_by_timeout = True
+        report_progress(99, "stopped")
 
     # Reset session to avoid mixing previous scan results.
     try:
@@ -705,20 +850,24 @@ def scan():
     replacer_rules = []
     context_name = None
     user_context = None
+    rule_suffix = _safe_scan_id(scan_id)
+    if rule_suffix == "noid":
+        rule_suffix = f"{rule_suffix}-{int(time.time() * 1000)}"
 
     try:
         report_progress(5, "starting")
+        _cleanup_replacer_rules("scan-auth-")
         if isinstance(auth_config, dict):
             method = auth_config.get("method")
             try:
                 if method == "form":
                     context_name, user_context, auth_status = _apply_form_auth(auth_config, target)
                 elif method == "cookie":
-                    rule_id, auth_status = _apply_cookie_auth(auth_config.get("cookie"))
+                    rule_id, auth_status = _apply_cookie_auth(auth_config.get("cookie"), rule_suffix)
                     if rule_id is not None:
                         replacer_rules.append(rule_id)
                 elif method == "header":
-                    rule_id, auth_status = _apply_header_auth(auth_config.get("header"))
+                    rule_id, auth_status = _apply_header_auth(auth_config.get("header"), rule_suffix)
                     if rule_id is not None:
                         replacer_rules.append(rule_id)
                 else:
@@ -750,173 +899,239 @@ def scan():
                     pass
                 user_context = None
 
+        if scope_same_host_only and not context_name:
+            scope_context_name = f"scope-context-{int(time.time() * 1000)}"
+            scope_context_id = zap.context.new_context(scope_context_name)
+            if isinstance(scope_context_id, dict):
+                scope_context_id = scope_context_id.get("contextId") or scope_context_id.get("context_id") or scope_context_id.get("id")
+            scope_context_id = _normalize_numeric_id(scope_context_id)
+            if scope_context_id:
+                include_regex = _build_context_regex(target)
+                zap.context.include_in_context(scope_context_name, include_regex)
+                zap.context.set_context_in_scope(scope_context_name, "true")
+                context_name = scope_context_name
+
         if port_scan_only:
             report_progress(20, "port_scan")
             port_scan_results, port_scan_scheme, port_scan_host = _run_port_scan(target)
             report_progress(90, "port_scan")
         else:
-            _apply_spider_options()
-            _apply_ascan_options()
-
-            # --- パッシブスキャン停止 ---
-            zap.pscan.set_enabled(enabled='false', apikey=ZAP_API_KEY)
-
-
-            # --- Spider ---
-            print("[*] Starting spider...")
-            if user_context:
-                context_id, user_id = user_context
-                try:
-                    spider_id = zap.spider.scan_as_user(
-                        contextid=context_id,
-                        userid=user_id,
-                        url=target,
-                    )
-                except TypeError:
-                    spider_id = zap.spider.scan_as_user(context_id, user_id, target)
-            else:
-                spider_id = zap.spider.scan(target)
-
-            spider_id = _normalize_scan_id(spider_id)
-            if not spider_id and user_context:
-                _mark_auth_fallback(auth_status, "認証スパイダー開始に失敗したため未認証で実行します")
-                spider_id = _normalize_scan_id(zap.spider.scan(target))
-
-            if not spider_id:
-                raise RuntimeError("Spider start failed")
-
-            def spider_progress(status_value):
-                report_progress(5 + int(status_value * 0.4), "spider")
-
-            spider_completed, spider_message = _poll_scan_status(
-                zap.spider.status,
-                spider_id,
-                2,
-                "Spider",
-                max_seconds=SPIDER_MAX_DURATION_MINUTES * 60,
-                stop_func=zap.spider.stop,
-                progress_callback=spider_progress,
+            spider_max_minutes = max(1, (spider_max_seconds + 59) // 60)
+            active_max_minutes = max(1, (active_max_seconds + 59) // 60)
+            _apply_spider_options(
+                max_duration_minutes=spider_max_minutes,
+                max_depth=spider_max_depth,
+                max_children=spider_max_children,
+                delay_ms=delay_ms,
             )
-            if not spider_completed and spider_message:
-                _append_auth_message(auth_status, spider_message)
-            print("[+] Spider complete.")
+            _apply_ascan_options(
+                max_duration_minutes=active_max_minutes,
+                delay_ms=delay_ms,
+                attack_strength=attack_strength,
+                alert_threshold=alert_threshold,
+            )
+
+            # --- パッシブスキャン ---
+            try:
+                zap.pscan.set_enabled(enabled='true' if passive_wait_seconds > 0 else 'false', apikey=ZAP_API_KEY)
+            except Exception:
+                pass
 
 
-            # --- Active Scan ---
-            print("[*] Starting Active Scan...")
-
-            # 全無効化
-            zap.ascan.disable_all_scanners(apikey=ZAP_API_KEY)
-            print("[+] Disabled all scanners.")
-
-            # 未知のscan_typesなどで有効IDがなければデフォルトセットを有効化
-            if not enabled_ids_str:
-                for ids in VULN_TYPE_IDS.values():
-                    enabled_ids.extend(ids)
-                enabled_ids = list(set(enabled_ids))
-                enabled_ids_str = ",".join(enabled_ids)
-                print(f"[!] No valid scan_types provided. Falling back to default set: {enabled_ids_str}")
-
-            # 必要な plugin IDs だけ有効化
-            if enabled_ids_str:
-                available_ids = _get_available_scanner_ids()
-                if available_ids:
-                    enabled_ids = [sid for sid in enabled_ids if sid in available_ids]
-                    enabled_ids_str = ",".join(enabled_ids)
-                    if enabled_ids_str:
-                        zap.ascan.enable_scanners(ids=enabled_ids_str, apikey=ZAP_API_KEY)
-                        print(f"[+] Enabled scanners: {enabled_ids_str}")
-                    else:
-                        print("[!] No valid scanner IDs matched. Falling back to enable all scanners.")
-                        zap.ascan.enable_all_scanners(apikey=ZAP_API_KEY)
-                else:
+            if timebox_exceeded():
+                mark_stopped()
+                _append_auth_message(auth_status, "時間上限のためスキャンを停止しました")
+            else:
+                # --- Spider ---
+                print("[*] Starting spider...")
+                if user_context:
+                    context_id, user_id = user_context
                     try:
-                        zap.ascan.enable_scanners(ids=enabled_ids_str, apikey=ZAP_API_KEY)
-                        print(f"[+] Enabled scanners: {enabled_ids_str}")
-                    except Exception as exc:
-                        print(f"[!] Failed to enable scanners by ID: {exc}. Falling back to enable all scanners.")
-                        zap.ascan.enable_all_scanners(apikey=ZAP_API_KEY)
-            else:
-                return jsonify({"error": "No valid scan_types provided"}), 400
-
-            # Active Scan 実行
-            scan_target = _pick_scan_target(target, spider_id)
-            if scan_target != target:
-                _access_target(scan_target)
-            else:
-                _access_target(target)
-
-            if user_context:
-                context_id, user_id = user_context
-                try:
-                    ascan_id = zap.ascan.scan_as_user(
-                        url=scan_target,
-                        contextid=context_id,
-                        userid=user_id,
-                        apikey=ZAP_API_KEY,
-                    )
-                except TypeError:
-                    ascan_id = zap.ascan.scan_as_user(scan_target, context_id, user_id, apikey=ZAP_API_KEY)
-            else:
-                ascan_id = zap.ascan.scan(scan_target, apikey=ZAP_API_KEY)
-
-            ascan_id = _normalize_scan_id(ascan_id)
-            active_scan_ran = False
-
-            if not ascan_id and user_context:
-                _mark_auth_fallback(auth_status, "認証アクティブスキャン開始に失敗したため未認証で実行します")
-                ascan_id = _normalize_scan_id(zap.ascan.scan(scan_target, apikey=ZAP_API_KEY))
-
-            if not ascan_id:
-                _mark_auth_fallback(auth_status, "アクティブスキャン開始に失敗したためスキャンを継続します（結果が不完全な可能性があります）")
-            else:
-                def ascan_progress(status_value):
-                    report_progress(45 + int(status_value * 0.5), "active")
-
-                ascan_completed, ascan_message = _poll_scan_status(
-                    zap.ascan.status,
-                    ascan_id,
-                    5,
-                    "Active Scan",
-                    max_seconds=ASCAN_MAX_DURATION_MINUTES * 60,
-                    stop_func=zap.ascan.stop,
-                    progress_callback=ascan_progress,
-                )
-                if ascan_completed:
-                    active_scan_ran = True
+                        spider_id = zap.spider.scan_as_user(
+                            contextid=context_id,
+                            userid=user_id,
+                            url=target,
+                        )
+                    except TypeError:
+                        spider_id = zap.spider.scan_as_user(context_id, user_id, target)
+                elif scope_same_host_only and context_name:
+                    try:
+                        spider_id = zap.spider.scan(url=target, contextname=context_name, subtreeonly="true")
+                    except TypeError:
+                        spider_id = zap.spider.scan(target)
                 else:
-                    if ascan_message:
-                        _append_auth_message(auth_status, ascan_message)
-                    if user_context:
-                        _mark_auth_fallback(auth_status, "認証アクティブスキャンが完了しなかったため未認証で再実行します")
-                        ascan_id = _normalize_scan_id(zap.ascan.scan(scan_target, apikey=ZAP_API_KEY))
-                        if ascan_id:
-                            fallback_completed, fallback_message = _poll_scan_status(
-                                zap.ascan.status,
-                                ascan_id,
-                                5,
-                                "Active Scan",
-                                max_seconds=ASCAN_MAX_DURATION_MINUTES * 60,
-                                stop_func=zap.ascan.stop,
-                                progress_callback=ascan_progress,
-                            )
-                            if fallback_completed:
-                                active_scan_ran = True
-                            elif fallback_message:
-                                _append_auth_message(auth_status, fallback_message)
+                    spider_id = zap.spider.scan(target)
+
+                spider_id = _normalize_scan_id(spider_id)
+                if not spider_id and user_context:
+                    _mark_auth_fallback(auth_status, "認証スパイダー開始に失敗したため未認証で実行します")
+                    spider_id = _normalize_scan_id(zap.spider.scan(target))
+
+                if not spider_id:
+                    raise RuntimeError("Spider start failed")
+
+                def spider_progress(status_value):
+                    report_progress(5 + int(status_value * 0.4), "spider")
+
+                spider_max_allowed = spider_max_seconds
+                remaining = remaining_seconds()
+                if remaining is not None:
+                    spider_max_allowed = min(spider_max_allowed, remaining)
+                spider_completed, spider_message = _poll_scan_status(
+                    zap.spider.status,
+                    spider_id,
+                    2,
+                    "Spider",
+                    max_seconds=spider_max_allowed,
+                    stop_func=zap.spider.stop,
+                    progress_callback=spider_progress,
+                )
+                if not spider_completed and spider_message:
+                    _append_auth_message(auth_status, spider_message)
+                if not spider_completed and timebox_exceeded():
+                    mark_stopped()
+                print("[+] Spider complete.")
+
+                # --- Active Scan ---
+                if not stopped_by_timeout and active_enabled:
+                    print("[*] Starting Active Scan...")
+
+                    # 全無効化
+                    zap.ascan.disable_all_scanners(apikey=ZAP_API_KEY)
+                    print("[+] Disabled all scanners.")
+
+                    # 未知のscan_typesなどで有効IDがなければデフォルトセットを有効化
+                    if not enabled_ids_str:
+                        for ids in VULN_TYPE_IDS.values():
+                            enabled_ids.extend(ids)
+                        enabled_ids = list(set(enabled_ids))
+                        enabled_ids_str = ",".join(enabled_ids)
+                        print(f"[!] No valid scan_types provided. Falling back to default set: {enabled_ids_str}")
+
+                    # 必要な plugin IDs だけ有効化
+                    if enabled_ids_str:
+                        available_ids = _get_available_scanner_ids()
+                        if available_ids:
+                            enabled_ids = [sid for sid in enabled_ids if sid in available_ids]
+                            enabled_ids_str = ",".join(enabled_ids)
+                            if enabled_ids_str:
+                                zap.ascan.enable_scanners(ids=enabled_ids_str, apikey=ZAP_API_KEY)
+                                print(f"[+] Enabled scanners: {enabled_ids_str}")
+                            else:
+                                print("[!] No valid scanner IDs matched. Falling back to enable all scanners.")
+                                zap.ascan.enable_all_scanners(apikey=ZAP_API_KEY)
                         else:
-                            _append_auth_message(auth_status, "アクティブスキャン開始に失敗しました")
+                            try:
+                                zap.ascan.enable_scanners(ids=enabled_ids_str, apikey=ZAP_API_KEY)
+                                print(f"[+] Enabled scanners: {enabled_ids_str}")
+                            except Exception as exc:
+                                print(f"[!] Failed to enable scanners by ID: {exc}. Falling back to enable all scanners.")
+                                zap.ascan.enable_all_scanners(apikey=ZAP_API_KEY)
                     else:
-                        _append_auth_message(auth_status, "アクティブスキャンが完了しませんでした")
+                        return jsonify({"error": "No valid scan_types provided"}), 400
 
-            if active_scan_ran:
-                print("[+] Active Scan complete.")
-            else:
-                print("[!] Active Scan skipped.")
+                    # Active Scan 実行
+                    scan_target = _pick_scan_target(target, spider_id)
+                    if scan_target != target:
+                        _access_target(scan_target)
+                    else:
+                        _access_target(target)
 
-            if port_scan_requested:
-                report_progress(90, "port_scan")
-                port_scan_results, port_scan_scheme, port_scan_host = _run_port_scan(target)
+                    if user_context:
+                        context_id, user_id = user_context
+                        try:
+                            ascan_id = zap.ascan.scan_as_user(
+                                url=scan_target,
+                                contextid=context_id,
+                                userid=user_id,
+                                apikey=ZAP_API_KEY,
+                            )
+                        except TypeError:
+                            ascan_id = zap.ascan.scan_as_user(scan_target, context_id, user_id, apikey=ZAP_API_KEY)
+                    else:
+                        if scope_same_host_only:
+                            try:
+                                ascan_id = zap.ascan.scan(scan_target, inscopeonly="true", apikey=ZAP_API_KEY)
+                            except TypeError:
+                                ascan_id = zap.ascan.scan(scan_target, apikey=ZAP_API_KEY)
+                        else:
+                            ascan_id = zap.ascan.scan(scan_target, apikey=ZAP_API_KEY)
+
+                    ascan_id = _normalize_scan_id(ascan_id)
+                    active_scan_ran = False
+
+                    if not ascan_id and user_context:
+                        _mark_auth_fallback(auth_status, "認証アクティブスキャン開始に失敗したため未認証で実行します")
+                        ascan_id = _normalize_scan_id(zap.ascan.scan(scan_target, apikey=ZAP_API_KEY))
+
+                    if not ascan_id:
+                        _mark_auth_fallback(auth_status, "アクティブスキャン開始に失敗したためスキャンを継続します（結果が不完全な可能性があります）")
+                    else:
+                        def ascan_progress(status_value):
+                            report_progress(45 + int(status_value * 0.5), "active_scan")
+
+                        ascan_max_allowed = active_max_seconds
+                        remaining = remaining_seconds()
+                        if remaining is not None:
+                            ascan_max_allowed = min(ascan_max_allowed, remaining)
+                        ascan_completed, ascan_message = _poll_scan_status(
+                            zap.ascan.status,
+                            ascan_id,
+                            5,
+                            "Active Scan",
+                            max_seconds=ascan_max_allowed,
+                            stop_func=zap.ascan.stop,
+                            progress_callback=ascan_progress,
+                        )
+                        if ascan_completed:
+                            active_scan_ran = True
+                        else:
+                            if ascan_message:
+                                _append_auth_message(auth_status, ascan_message)
+                            if timebox_exceeded():
+                                mark_stopped()
+                            if user_context and not stopped_by_timeout:
+                                _mark_auth_fallback(auth_status, "認証アクティブスキャンが完了しなかったため未認証で再実行します")
+                                ascan_id = _normalize_scan_id(zap.ascan.scan(scan_target, apikey=ZAP_API_KEY))
+                                if ascan_id:
+                                    fallback_completed, fallback_message = _poll_scan_status(
+                                        zap.ascan.status,
+                                        ascan_id,
+                                        5,
+                                        "Active Scan",
+                                        max_seconds=ascan_max_allowed,
+                                        stop_func=zap.ascan.stop,
+                                        progress_callback=ascan_progress,
+                                    )
+                                    if fallback_completed:
+                                        active_scan_ran = True
+                                    elif fallback_message:
+                                        _append_auth_message(auth_status, fallback_message)
+                                else:
+                                    _append_auth_message(auth_status, "アクティブスキャン開始に失敗しました")
+                            elif not stopped_by_timeout:
+                                _append_auth_message(auth_status, "アクティブスキャンが完了しませんでした")
+
+                    if active_scan_ran:
+                        print("[+] Active Scan complete.")
+                    else:
+                        print("[!] Active Scan skipped.")
+
+                if port_scan_requested:
+                    report_progress(90, "port_scan")
+                    port_scan_results, port_scan_scheme, port_scan_host = _run_port_scan(target)
+
+            if not stopped_by_timeout and passive_wait_seconds > 0:
+                report_progress(90, "passive_wait")
+                wait_max = passive_wait_seconds
+                remaining = remaining_seconds()
+                if remaining is not None:
+                    wait_max = min(wait_max, remaining)
+                passive_completed, passive_message = _wait_for_passive_scan(wait_max)
+                if not passive_completed and passive_message:
+                    _append_auth_message(auth_status, passive_message)
+                if timebox_exceeded():
+                    mark_stopped()
 
     finally:
         for rule_id in replacer_rules:
@@ -937,7 +1152,7 @@ def scan():
         if lock_acquired:
             SCAN_LOCK.release()
 
-    report_progress(99, "reporting")
+    report_progress(99, "collecting_alerts")
     report_json = None
     report_payload = None
     if port_scan_only:
@@ -984,7 +1199,16 @@ def scan():
         with open(html_path, 'w') as f:
             f.write(html_report)
 
-    return jsonify({"message": "Scan complete", "report": report, "auth_status": auth_status})
+    final_status = "stopped" if stopped_by_timeout else "finished"
+    final_error = "stopped_by_timeout" if stopped_by_timeout else None
+    return jsonify({
+        "message": "Scan complete",
+        "report": report,
+        "auth_status": auth_status,
+        "scan_status": final_status,
+        "error": final_error,
+        "scan_config": scan_config,
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

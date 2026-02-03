@@ -69,6 +69,9 @@ const getPriorityFromSeverity = (severity?: VulnerabilityData['severity']): 'hig
       return 'high';
     case 'medium':
       return 'medium';
+    case 'info':
+    case 'low':
+      return 'low';
     default:
       return 'low';
   }
@@ -89,6 +92,8 @@ const getPriorityLabel = (priority: string) => {
 
 const getSeverityLabel = (severity: VulnerabilityData['severity'] | string) => {
   switch (severity) {
+    case 'info':
+      return '情報';
     case 'critical':
       return '重大';
     case 'high':
@@ -223,6 +228,7 @@ function Dashboard() {
   const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
   const [aiRefreshToken, setAiRefreshToken] = useState(0);
   const [retryingKey, setRetryingKey] = useState<string | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'high_medium' | 'high'>('all');
 
   // Scroll to top when component mounts or view changes
   useEffect(() => {
@@ -523,6 +529,7 @@ function Dashboard() {
   }
 
   const severityColors = {
+    info: '#3B82F6',
     low: '#10B981',
     medium: '#F59E0B',
     high: '#EF4444',
@@ -534,6 +541,17 @@ function Dashboard() {
     return acc;
   }, {} as Record<string, number>);
   const totalVulnerabilities = scanResults.vulnerabilities.length;
+  const stoppedByTimeout = scanResults.scanStatus === 'stopped' || scanResults.scanError === 'stopped_by_timeout';
+
+  const filteredVulnerabilities = scanResults.vulnerabilities.filter((vuln) => {
+    if (severityFilter === 'high') {
+      return vuln.severity === 'high' || vuln.severity === 'critical';
+    }
+    if (severityFilter === 'high_medium') {
+      return vuln.severity === 'high' || vuln.severity === 'critical' || vuln.severity === 'medium';
+    }
+    return true;
+  });
 
   const pieData = Object.entries(severityCounts).map(([severity, count]) => ({
     name: getSeverityLabel(severity),
@@ -542,12 +560,8 @@ function Dashboard() {
   }));
 
   const aiAdviceList = Array.isArray(aiAdvice) ? aiAdvice : [];
-  const hasPendingAdvice = aiAdviceList.some((item) => item.status === 'pending' || item.status === 'processing');
   const hasCompletedAdvice = aiAdviceList.some((item) => item.status === 'completed');
-  const isAiAdviceReady = scanResults.vulnerabilities.length === 0
-    ? true
-    : aiAdviceList.length > 0 && !hasPendingAdvice;
-  const canDownloadPdf = !isLoadingAdvice && isAiAdviceReady;
+  const canDownloadPdf = !isLoadingAdvice;
 
   const generatePDFReport = async () => {
     if (!canDownloadPdf) {
@@ -558,88 +572,286 @@ function Dashboard() {
     const pdf = new jsPDF();
     await ensurePdfFont(pdf);
     const pageWidth = pdf.internal.pageSize.width;
-    
-    // Title
-    pdf.setFontSize(20);
-    pdf.text('SecureGuard 脆弱性レポート', pageWidth / 2, 20, { align: 'center' });
-    
-    // Scan info
-    pdf.setFontSize(12);
-    pdf.text(`対象URL: ${scanResults.targetUrl}`, 20, 40);
-    pdf.text(`スキャン実行日時: ${new Date(scanResults.timestamp).toLocaleString('ja-JP')}`, 20, 50);
-    pdf.text(`検出された脆弱性: ${totalVulnerabilities}件`, 20, 60);
-    
-    // Summary
-    pdf.setFontSize(14);
-    pdf.text('サマリー', 20, 80);
-    pdf.setFontSize(10);
-    pdf.text(`検出された脆弱性: ${scanResults.vulnerabilities.length}件`, 20, 90);
-    pdf.text(`開放ポート: ${scanResults.openPorts.join(', ')}`, 20, 100);
-    
-    // Vulnerabilities
-    pdf.setFontSize(14);
-    pdf.text('検出された脆弱性', 20, 120);
-    
-    let yPosition = 130;
-    scanResults.vulnerabilities.forEach((vuln, index) => {
-      if (yPosition > 250) {
+    const pageHeight = pdf.internal.pageSize.height;
+    const marginX = 18;
+    const marginY = 18;
+    const contentWidth = pageWidth - marginX * 2;
+    let yPosition = marginY;
+
+    const lineHeightFor = (fontSize: number) => Math.max(4, fontSize * 0.35 + 1);
+    const ensureSpace = (height: number) => {
+      if (yPosition + height > pageHeight - marginY) {
         pdf.addPage();
-        yPosition = 20;
+        yPosition = marginY;
       }
-      
-      pdf.setFontSize(12);
-      pdf.text(`${index + 1}. ${vuln.type} [${vuln.severity.toUpperCase()}]`, 20, yPosition);
-      pdf.setFontSize(10);
-      pdf.text(`ポート: ${vuln.port}`, 25, yPosition + 10);
-      
-      const descLines = pdf.splitTextToSize(vuln.description, pageWidth - 50);
-      pdf.text(descLines, 25, yPosition + 20);
-      
-      yPosition += 40 + (descLines.length * 4);
+    };
+    const addLines = (lines: string[], fontSize: number, indent = 0, gap = 0) => {
+      const lineHeight = lineHeightFor(fontSize);
+      ensureSpace(lines.length * lineHeight + gap);
+      pdf.setFontSize(fontSize);
+      pdf.text(lines, marginX + indent, yPosition);
+      yPosition += lines.length * lineHeight + gap;
+    };
+    const addParagraph = (text: string, fontSize = 10, indent = 0, gap = 0) => {
+      const lines = pdf.splitTextToSize(text, contentWidth - indent);
+      addLines(lines, fontSize, indent, gap);
+    };
+    const addCenteredTitle = (text: string) => {
+      const fontSize = 18;
+      const lineHeight = lineHeightFor(fontSize);
+      ensureSpace(lineHeight + 4);
+      pdf.setFontSize(fontSize);
+      pdf.text(text, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += lineHeight + 4;
+    };
+    const addSectionTitle = (text: string) => {
+      addParagraph(text, 13, 0, 3);
+    };
+    const addSubTitle = (text: string) => {
+      addParagraph(text, 11, 0, 2);
+    };
+    const addDivider = () => {
+      ensureSpace(3);
+      pdf.setDrawColor(220);
+      pdf.line(marginX, yPosition, pageWidth - marginX, yPosition);
+      yPosition += 4;
+    };
+    const maskSensitiveLine = (line: string) => {
+      let masked = line;
+      masked = masked.replace(/(authorization|cookie)\s*:\s*[^\n]*/gi, '$1: ***');
+      masked = masked.replace(/(token|apikey|api_key|access_token|session|jwt)\s*=?\s*[^\s&]+/gi, '$1=***');
+      return masked;
+    };
+    const maskSnippet = (lines: string[]) => lines.map((line) => maskSensitiveLine(line));
+
+    const criticalCount = Number(severityCounts.critical || 0);
+    const highCount = Number(severityCounts.high || 0);
+    const mediumCount = Number(severityCounts.medium || 0);
+    const lowCount = Number(severityCounts.low || 0);
+    const infoCount = Number(severityCounts.info || 0);
+    const highRiskCount = criticalCount + highCount;
+    const midPlusCount = highRiskCount + mediumCount;
+    const openPortsCount = scanResults.openPorts.length;
+    const openPortsText = openPortsCount > 0 ? scanResults.openPorts.join(', ') : 'なし';
+    const scanTypeLabel = scanResults.scanType === 'bulk' ? '一括スキャン' : '詳細スキャン';
+
+    const adviceByKey = new Map(
+      aiAdviceList
+        .filter((item) => item && typeof item.alertKey === 'string')
+        .map((item) => [item.alertKey as string, item] as const),
+    );
+    const adviceById = new Map(
+      aiAdviceList
+        .filter((item) => item && typeof item.vulnId === 'string')
+        .map((item) => [item.vulnId, item] as const),
+    );
+
+    const getFallbackMitigations = (vulnType: string) => {
+      const lower = (vulnType || '').toLowerCase();
+      if (lower.includes('sql')) {
+        return [
+          'プレースホルダ/バインド変数を使用する',
+          'ORMの安全APIを使用する',
+          '入力値の型チェック/バリデーションを実施する',
+          'DB最小権限を適用する',
+          'エラーメッセージを抑制する',
+          'WAFは補助として利用する',
+        ];
+      }
+      if (lower.includes('xss') || lower.includes('cross site')) {
+        return [
+          '出力エスケープを徹底する',
+          'テンプレートエンジンの自動エスケープを有効化する',
+          'CSPを導入する',
+          'HttpOnly/SameSiteを適用する',
+          '入力検証は補助として実施する',
+        ];
+      }
+      return [
+        '入力値の型チェック/バリデーションを実施する',
+        '権限の最小化を徹底する',
+        'エラーメッセージを抑制する',
+        'WAFは補助として利用する',
+      ];
+    };
+
+    addCenteredTitle('SecureGuard 脆弱性レポート');
+    addParagraph(`対象URL: ${scanResults.targetUrl}`);
+    addParagraph(`スキャン実行日時: ${new Date(scanResults.timestamp).toLocaleString('ja-JP')}`);
+    addParagraph(`スキャンタイプ: ${scanTypeLabel}`);
+    addParagraph(`検出された脆弱性（合計）: ${totalVulnerabilities}件`);
+    addParagraph(`開放ポート（合計）: ${openPortsCount}件`);
+    addParagraph(`開放ポート一覧: ${openPortsText}`);
+    if (stoppedByTimeout) {
+      addParagraph('※時間上限で停止: タイムボックスに達したためスキャンを停止しました。');
+    }
+    addDivider();
+
+    addSectionTitle('サマリー');
+    addParagraph(`脆弱性検出数: ${totalVulnerabilities}件`);
+    addParagraph(`開放ポート数: ${openPortsCount}件`);
+    addParagraph(`中以上のリスク件数: ${midPlusCount}件（High+Medium、CriticalはHighに含む）`);
+    addParagraph(
+      `重要度分布: Critical=${criticalCount}, High=${highCount}, Medium=${mediumCount}, Low=${lowCount}, Info=${infoCount}（合計${totalVulnerabilities}）`,
+    );
+    if (totalVulnerabilities === 0) {
+      addParagraph('検出された脆弱性はありません。');
+    }
+    addDivider();
+
+    addSectionTitle('検出された脆弱性（証拠付き）');
+    if (scanResults.vulnerabilities.length === 0) {
+      addParagraph('検出結果がありません。');
+    }
+    scanResults.vulnerabilities.forEach((vuln, index) => {
+      const alertKey = vuln.alertKey ?? vuln.id;
+      const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
+      const status = normalizeAiStatus(advice?.status);
+      const statusLabel = getAiStatusLabel(status);
+      const title = advice?.title ? normalizeAiText(advice.title) : (vuln.type || '脆弱性項目');
+      const summaryFallback = normalizeAiText(vuln.description || '');
+      const impactFallback = normalizeAiText(vuln.impact || '');
+      const summary = status === 'completed'
+        ? normalizeAiText(advice?.summary || summaryFallback)
+        : summaryFallback;
+      const impact = status === 'completed'
+        ? normalizeAiText(advice?.impact || impactFallback)
+        : impactFallback;
+      const aiSteps = status === 'completed' && Array.isArray(advice?.steps)
+        ? normalizeAiSteps(advice.steps)
+        : [];
+      let mitigationSteps = aiSteps.length > 0 ? aiSteps : getFallbackMitigations(vuln.type || '');
+      if (mitigationSteps.length < 4) {
+        const padding = getFallbackMitigations('');
+        mitigationSteps = [...mitigationSteps, ...padding].slice(0, 6);
+      }
+      const evidence = vuln.evidence;
+      const requestSnippet = maskSnippet(trimSnippet(evidence?.request_snippet));
+      const responseSnippet = maskSnippet(trimSnippet(evidence?.response_snippet));
+
+      addSubTitle(`${index + 1}. ${title}`);
+      addParagraph(`重要度: ${getSeverityLabel(vuln.severity)} / ポート: ${vuln.port}`);
+      addParagraph(`AI解析: ${statusLabel}`);
+      if (status === 'failed' && advice?.error_reason) {
+        addParagraph(`失敗理由: ${normalizeAiText(advice.error_reason)}`, 9);
+      }
+      if (status === 'completed') {
+        addParagraph(AI_GENERAL_LABEL, 8, 0, 2);
+      }
+      addParagraph(`概要: ${summary || '未取得'}`);
+      addParagraph(`影響: ${impact || '未取得'}`);
+
+      addParagraph('対策:');
+      mitigationSteps.forEach((step) => {
+        addParagraph(`・${step}`, 10, 2);
+      });
+
+      addParagraph('証拠:');
+      addParagraph(`該当URL: ${evidence?.affected_url || '未取得'}`, 10, 2);
+      addParagraph(`パス: ${evidence?.path || '未取得'}`, 10, 2);
+      addParagraph(`メソッド: ${evidence?.method || '未取得'}`, 10, 2);
+      addParagraph(`パラメータ: ${evidence?.parameter || '未取得'}`, 10, 2);
+      addParagraph(`検出根拠: ${evidence?.rationale || '未取得'}`, 10, 2);
+      addParagraph(`確度: ${getConfidenceLabel(evidence?.confidence ?? null)}`, 10, 2);
+      addParagraph(`再現手順: ${evidence?.reproduction || '未取得'}`, 10, 2);
+
+      addParagraph('抜粋（最大10行）:');
+      if (requestSnippet.length > 0) {
+        addParagraph('リクエスト:', 9, 2);
+        requestSnippet.forEach((line) => addParagraph(line, 9, 6));
+      } else {
+        addParagraph('リクエスト: 未取得', 9, 2);
+      }
+      if (responseSnippet.length > 0) {
+        addParagraph('レスポンス:', 9, 2);
+        responseSnippet.forEach((line) => addParagraph(line, 9, 6));
+      } else {
+        addParagraph('レスポンス: 未取得', 9, 2);
+      }
+
+      addDivider();
     });
 
-    const adviceItems = aiAdviceList.filter((item) => item.status === 'completed');
-    if (adviceItems.length > 0) {
-      if (yPosition > 240) {
-        pdf.addPage();
-        yPosition = 20;
-      }
+    addSectionTitle('AI解析サマリー');
+    addParagraph(`高リスク脆弱性数: ${analysisData.criticalIssues}件`);
+    addParagraph(`中リスク脆弱性数: ${analysisData.mediumIssues}件`);
+    addParagraph(`低リスク脆弱性数: ${lowCount}件`);
+    addParagraph(`情報レベル脆弱性数: ${infoCount}件`);
 
-      pdf.setFontSize(14);
-      pdf.text('AI解析', 20, yPosition);
-      yPosition += 10;
+    const riskComment = analysisData.overallRisk === 'high'
+      ? '緊急対応が必要です'
+      : analysisData.overallRisk === 'medium'
+        ? '早期対応を推奨します'
+        : '継続的な監視が必要です';
+    addSectionTitle('リスク評価');
+    addParagraph(`総合リスクレベル: ${overallRiskLabel}`);
+    addParagraph(`コメント: ${riskComment}`);
 
-      adviceItems.forEach((item, index) => {
-        if (yPosition > 250) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-
-        const title = normalizeAiText(item.title || `解析 ${index + 1}`);
-        pdf.setFontSize(12);
-        pdf.text(`${index + 1}. ${title}`, 20, yPosition);
-        yPosition += 8;
-
-        pdf.setFontSize(10);
-        const summaryText = normalizeAiText(item.summary || '');
-        const summaryLines = pdf.splitTextToSize(`概要: ${summaryText}`, pageWidth - 50);
-        pdf.text(summaryLines, 25, yPosition);
-        yPosition += summaryLines.length * 4 + 4;
-
-        const impactText = normalizeAiText(item.impact || '');
-        const impactLines = pdf.splitTextToSize(`影響: ${impactText}`, pageWidth - 50);
-        pdf.text(impactLines, 25, yPosition);
-        yPosition += impactLines.length * 4 + 4;
-
-        const stepsText = item.steps && item.steps.length > 0
-          ? normalizeAiSteps(item.steps).join(' / ')
-          : '';
-        const stepsLines = pdf.splitTextToSize(`対策: ${stepsText}`, pageWidth - 50);
-        pdf.text(stepsLines, 25, yPosition);
-        yPosition += stepsLines.length * 4 + 8;
-      });
+    addSectionTitle('最優先対応項目');
+    if (mostCritical) {
+      const priorityReason = mostCriticalImpact
+        ? normalizeAiText(mostCriticalImpact)
+        : (mostCriticalSummary || '影響が大きいと判断されるため');
+      addParagraph(`${mostCriticalTitle}（ポート ${mostCritical.port}）`);
+      addParagraph(`理由: ${priorityReason}`);
+    } else {
+      addParagraph('該当なし');
     }
-    
+
+    addSectionTitle('AI推奨改善策');
+    addParagraph(AI_GENERAL_LABEL, 8, 0, 2);
+    if (recommendations.length === 0) {
+      addParagraph('推奨改善策は未取得です。');
+    }
+    recommendations.forEach((rec, index) => {
+      addParagraph(`${index + 1}. ${normalizeAiText(rec.title)}`);
+      addParagraph(`概要: ${normalizeAiText(rec.description)}`, 10, 2);
+      addParagraph(`期待効果: ${normalizeAiText(rec.impact)}`, 10, 2);
+    });
+
+    addSectionTitle('詳細分析と解説');
+    const detailTargets = scanResults.vulnerabilities.slice(0, 3);
+    detailTargets.forEach((vuln, index) => {
+      const alertKey = vuln.alertKey ?? vuln.id;
+      const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
+      const status = normalizeAiStatus(advice?.status);
+      const statusLabel = getAiStatusLabel(status);
+      const title = advice?.title ? normalizeAiText(advice.title) : (vuln.type || '脆弱性項目');
+      const summary = status === 'completed'
+        ? normalizeAiText(advice?.summary || vuln.description)
+        : normalizeAiText(vuln.description || '');
+      const impact = status === 'completed'
+        ? normalizeAiText(advice?.impact || vuln.impact)
+        : normalizeAiText(vuln.impact || '');
+      const steps = status === 'completed' && Array.isArray(advice?.steps)
+        ? normalizeAiSteps(advice.steps)
+        : [];
+      const analogy = status === 'completed'
+        ? normalizeAiText(advice?.analogy || getFallbackAnalogy(vuln.type))
+        : '';
+
+      addSubTitle(`${index + 1}. ${title}`);
+      addParagraph(`AI解析: ${statusLabel}`);
+      if (status === 'completed') {
+        addParagraph(AI_GENERAL_LABEL, 8, 0, 2);
+      }
+      addParagraph(`技術的解説: ${summary || '未取得'}`);
+      addParagraph(`影響: ${impact || '未取得'}`);
+      if (steps.length > 0) {
+        addParagraph('改善案:');
+        steps.forEach((step) => addParagraph(`・${step}`, 10, 2));
+      } else {
+        addParagraph('改善案: 未取得');
+      }
+      if (analogy) {
+        addParagraph(`わかりやすい例え: ${analogy}`);
+      }
+      addDivider();
+    });
+    if (scanResults.vulnerabilities.length > detailTargets.length) {
+      addParagraph('※詳細分析は上位3件を掲載しています。');
+    }
+
     pdf.save(`secureguard-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
@@ -797,6 +1009,15 @@ function Dashboard() {
                 </div>
               </div>
             )}
+            {stoppedByTimeout && (
+              <div className="mb-6 flex items-start space-x-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
+                <div className="text-sm text-amber-900">
+                  <p className="font-semibold">時間上限で停止</p>
+                  <p className="opacity-80">タイムボックスに達したためスキャンを停止しました。</p>
+                </div>
+              </div>
+            )}
             {/* Scan Info */}
             <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-slate-200">
               <div className="flex items-center justify-between mb-6">
@@ -912,6 +1133,12 @@ function Dashboard() {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm text-gray-600">
+                  <span>High: {severityCounts.high || 0}</span>
+                  <span>Medium: {severityCounts.medium || 0}</span>
+                  <span>Low: {severityCounts.low || 0}</span>
+                  <span>Info: {severityCounts.info || 0}</span>
+                </div>
               </div>
             </div>
 
@@ -932,9 +1159,23 @@ function Dashboard() {
 
             {/* Vulnerabilities List */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">検出された脆弱性</h3>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">検出された脆弱性</h3>
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <span>表示:</span>
+                  <select
+                    value={severityFilter}
+                    onChange={(e) => setSeverityFilter(e.target.value as 'all' | 'high_medium' | 'high')}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="high_medium">High+Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
               <div className="space-y-4">
-                {scanResults.vulnerabilities.map((vuln, index) => {
+                {filteredVulnerabilities.map((vuln, index) => {
                   const alertKey = vuln.alertKey ?? vuln.id;
                   const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
                   const status = advice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');

@@ -119,7 +119,7 @@ def _update_scan_status(
                         ELSE started_at
                     END,
                     completed_at = CASE
-                        WHEN %s IN ('finished', 'failed') THEN NOW()
+                        WHEN %s IN ('finished', 'failed', 'stopped') THEN NOW()
                         ELSE completed_at
                     END,
                     error = %s,
@@ -333,6 +333,7 @@ def zap_scan_task(
     scan_types: list[str] | None,
     user_id: int,
     auth: dict | None = None,
+    scan_config: dict | None = None,
 ):
     """
     Kick off a ZAP scan via the scanner service. Returns raw response data for later parsing.
@@ -369,6 +370,7 @@ def zap_scan_task(
             "scan_types": payload_scan_types,
             "auth": auth,
             "scan_id": scan_id,
+            "scan_config": scan_config,
         }
 
         def mark_running():
@@ -412,18 +414,35 @@ def zap_scan_task(
         )
         raise Exception("ZAP scan failed: report payload missing or invalid")
 
+    include_risks = None
+    scope_same_host_only = False
+    if isinstance(scan_config, dict):
+        alert_fetch = scan_config.get("alert_fetch") if isinstance(scan_config.get("alert_fetch"), dict) else {}
+        include_risks = alert_fetch.get("include_risks") if isinstance(alert_fetch, dict) else None
+        scope_same_host_only = bool(scan_config.get("scope_same_host_only"))
     parsed_report = parse_zap_report(
         raw_report,
         default_scan_type=scan_type_from_scan_types(payload_scan_types),
         default_target_url=url,
+        include_risks=include_risks,
+        scope_same_host_only=scope_same_host_only,
     )
     if isinstance(auth_status, dict):
         parsed_report["authStatus"] = auth_status
+    scan_status = data.get("scan_status") if isinstance(data, dict) else None
+    scan_error = data.get("error") if isinstance(data, dict) else None
+    final_status = "stopped" if scan_status == "stopped" else "finished"
+    final_error = "stopped_by_timeout" if final_status == "stopped" else None
+    if scan_error and final_status == "stopped":
+        final_error = scan_error
+    parsed_report["scanStatus"] = final_status
+    if final_error:
+        parsed_report["scanError"] = final_error
     _update_scan_status(
         scan_id,
         user_id,
-        "finished",
-        error=None,
+        final_status,
+        error=final_error,
         raw_report=raw_report,
         parsed_report=parsed_report,
         progress_percent=100,
@@ -446,4 +465,7 @@ def zap_scan_task(
         "response": data,
         "report": data.get("report"),
         "auth_status": auth_status,
+        "scan_config": scan_config,
+        "scan_status": final_status,
+        "error": final_error,
     }

@@ -7,7 +7,7 @@ export interface VulnerabilityData {
   id: string;
   alertKey?: string;
   type: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: 'info' | 'low' | 'medium' | 'high' | 'critical';
   port: number;
   description: string;
   impact: string;
@@ -33,6 +33,10 @@ export interface ScanResults {
   openPorts: number[];
   vulnerabilities: VulnerabilityData[];
   riskScore: number;
+  scanStatus?: string;
+  scanError?: string;
+  progressPhase?: string;
+  scanConfig?: Record<string, any> | null;
   authStatus?: {
     used: boolean;
     method?: string;
@@ -86,7 +90,8 @@ interface ScanContextType {
   startScan: (
     url: string,
     scanTypes?: string[],
-    auth?: ScanAuthConfig
+    auth?: ScanAuthConfig,
+    scanConfig?: Record<string, any> | null,
   ) => Promise<boolean>;
   clearResults: () => void;
 }
@@ -181,10 +186,18 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
       const data = await response.json();
       const parsed = data?.scan?.parsed_report;
       const latestId = data?.scan?.id;
+      const scanMeta = data?.scan;
       if (!isValidScanResults(parsed)) {
         return false;
       }
-      setScanResults(sanitizeScanResults(parsed));
+      const enriched: ScanResults = {
+        ...parsed,
+        scanStatus: scanMeta?.status,
+        scanError: scanMeta?.error,
+        progressPhase: scanMeta?.progress_phase,
+        scanConfig: scanMeta?.scan_config ?? null,
+      };
+      setScanResults(sanitizeScanResults(enriched));
       if (typeof latestId === 'number') {
         setScanId(latestId);
       }
@@ -242,10 +255,18 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
       }
       const data = await response.json();
       const parsed = data?.scan?.parsed_report;
+      const scanMeta = data?.scan;
       if (!isValidScanResults(parsed)) {
         return false;
       }
-      setScanResults(sanitizeScanResults(parsed));
+      const enriched: ScanResults = {
+        ...parsed,
+        scanStatus: scanMeta?.status,
+        scanError: scanMeta?.error,
+        progressPhase: scanMeta?.progress_phase,
+        scanConfig: scanMeta?.scan_config ?? null,
+      };
+      setScanResults(sanitizeScanResults(enriched));
       setScanId(scanId);
       return true;
     } catch {
@@ -256,7 +277,8 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
   const startScan = async (
     url: string,
     scanTypes?: string[],
-    auth?: ScanAuthConfig
+    auth?: ScanAuthConfig,
+    scanConfig?: Record<string, any> | null,
   ): Promise<boolean> => {
     setIsScanning(true);
     setScanResults(null);
@@ -277,6 +299,7 @@ export function ScanProvider({ children }: { children: React.ReactNode }) {
           url,
           scan_types: payloadScanTypes,
           auth: auth ?? null,
+          scan_config: scanConfig ?? null,
         }),
       });
 

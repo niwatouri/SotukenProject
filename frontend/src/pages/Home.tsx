@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, Globe, Settings, Scan, AlertTriangle, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useScan, ScanAuthConfig } from '../contexts/ScanContext';
+import { API_BASE_URL } from '../utils/api';
 import ScanConfirmModal from '../components/ScanConfirmModal';
 import Footer from '../components/Footer';
 

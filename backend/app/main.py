@@ -25,6 +25,7 @@ from app.config import (
 from app.db import get_db_connection, init_scan_schema
 from app.report_parser import parse_zap_report
 from app.scan_utils import normalize_report, scan_type_from_scan_types, validate_target_url
+from app.scan_presets import build_scan_config, get_presets_payload
 from app.tasks import ai_summary_task, zap_scan_task
 
 app = FastAPI()
@@ -121,16 +122,22 @@ def _verify_scanner_key(x_api_key: Optional[str]) -> None:
         raise HTTPException(status_code=403, detail="Invalid scanner API key")
 
 
-def _create_scan_record(user_id: int, url: str, scan_types: list[str], status: str) -> int:
+def _create_scan_record(
+    user_id: int,
+    url: str,
+    scan_types: list[str],
+    status: str,
+    scan_config: Optional[Dict[str, Any]] = None,
+) -> int:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO scans (user_id, target_url, scan_types, status, started_at, progress_percent)
-                VALUES (%s, %s, %s, %s, CASE WHEN %s = 'running' THEN NOW() ELSE NULL END, %s)
+                INSERT INTO scans (user_id, target_url, scan_types, scan_config, status, started_at, progress_percent, progress_phase)
+                VALUES (%s, %s, %s, %s, %s, CASE WHEN %s = 'running' THEN NOW() ELSE NULL END, %s, %s)
                 RETURNING id
                 """,
-                (user_id, url, Json(scan_types), status, status, 0),
+                (user_id, url, Json(scan_types), Json(scan_config) if scan_config else None, status, status, 0, "starting"),
             )
             row = cur.fetchone()
             return int(row["id"])
@@ -184,8 +191,8 @@ def _fetch_scan_by_job_id(user_id: int, job_id: str) -> Optional[Dict[str, Any]]
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, user_id, target_url, scan_types, status, job_id, created_at,
-                       started_at, completed_at, error, parsed_report, progress_percent
+                SELECT id, user_id, target_url, scan_types, scan_config, status, job_id, created_at,
+                       started_at, completed_at, error, parsed_report, progress_percent, progress_phase
                 FROM scans
                 WHERE user_id = %s AND job_id = %s
                 """,
@@ -199,8 +206,8 @@ def _fetch_scan_by_id(user_id: int, scan_id: int) -> Optional[Dict[str, Any]]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, user_id, target_url, scan_types, status, job_id, created_at,
-                       started_at, completed_at, error, parsed_report, progress_percent
+                SELECT id, user_id, target_url, scan_types, scan_config, status, job_id, created_at,
+                       started_at, completed_at, error, parsed_report, progress_percent, progress_phase
                 FROM scans
                 WHERE user_id = %s AND id = %s
                 """,
@@ -266,8 +273,8 @@ def _fetch_scans(user_id: int, limit: int, offset: int) -> list[Dict[str, Any]]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, target_url, scan_types, status, job_id, created_at,
-                       started_at, completed_at, error
+                SELECT id, target_url, scan_types, scan_config, status, job_id, created_at,
+                       started_at, completed_at, error, progress_phase
                 FROM scans
                 WHERE user_id = %s
                 ORDER BY created_at DESC
@@ -283,8 +290,8 @@ def _fetch_latest_scan(user_id: int) -> Optional[Dict[str, Any]]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, target_url, scan_types, status, job_id, created_at,
-                       started_at, completed_at, error, parsed_report
+                SELECT id, target_url, scan_types, scan_config, status, job_id, created_at,
+                       started_at, completed_at, error, parsed_report, progress_phase
                 FROM scans
                 WHERE user_id = %s
                   AND status = 'finished'
@@ -297,7 +304,7 @@ def _fetch_latest_scan(user_id: int) -> Optional[Dict[str, Any]]:
             return cur.fetchone()
 
 
-def _update_scan_progress(scan_id: int, progress_percent: int) -> None:
+def _update_scan_progress(scan_id: int, progress_percent: int, progress_phase: Optional[str] = None) -> None:
     progress_percent = max(0, min(99, int(progress_percent)))
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -305,10 +312,11 @@ def _update_scan_progress(scan_id: int, progress_percent: int) -> None:
                 """
                 UPDATE scans
                 SET progress_percent = GREATEST(progress_percent, %s),
+                    progress_phase = COALESCE(%s, progress_phase),
                     started_at = COALESCE(started_at, NOW())
-                WHERE id = %s AND status NOT IN ('finished', 'failed')
+                WHERE id = %s AND status NOT IN ('finished', 'failed', 'stopped')
                 """,
-                (progress_percent, scan_id),
+                (progress_percent, progress_phase, scan_id),
             )
 
 
@@ -513,6 +521,7 @@ async def update_scan_progress(
     data = await request.json()
     scan_id = data.get("scan_id")
     progress = data.get("progress_percent")
+    phase = data.get("phase")
     if scan_id is None or progress is None:
         raise HTTPException(status_code=400, detail="scan_id and progress_percent are required")
     try:
@@ -520,8 +529,13 @@ async def update_scan_progress(
         progress = int(progress)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail="scan_id/progress_percent must be numeric") from exc
-    _update_scan_progress(scan_id, progress)
+    _update_scan_progress(scan_id, progress, phase)
     return {"status": "ok"}
+
+
+@app.get("/scan-presets")
+def get_scan_presets(user: Dict[str, Any] = Depends(require_auth)):
+    return get_presets_payload()
 
 
 # --- RQタスク登録 ---
@@ -531,6 +545,7 @@ async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_au
     url = data.get("url")
     scan_types = data.get("scan_types")
     auth = data.get("auth")
+    scan_config_payload = data.get("scan_config")
     user_id = user.get("userId")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid user payload")
@@ -547,10 +562,12 @@ async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_au
     if not isinstance(scan_types, list) or len(scan_types) == 0:
         scan_types = ["all"]
     
-    scan_id = _create_scan_record(user_id, url, scan_types, "queued")
+    scan_config = build_scan_config(scan_config_payload)
+    scan_id = _create_scan_record(user_id, url, scan_types, "queued", scan_config)
 
     try:
-        # httpx タイムアウト (SCAN_TIMEOUT_SECONDS) に合わせてジョブタイムアウトを設定
+        max_duration = scan_config.get("max_duration_seconds") if isinstance(scan_config, dict) else None
+        job_timeout = max_duration if isinstance(max_duration, int) and max_duration > 0 else SCAN_TIMEOUT_SECONDS
         job = q.enqueue(
             zap_scan_task,
             scan_id,
@@ -558,7 +575,8 @@ async def start_scan(request: Request, user: Dict[str, Any] = Depends(require_au
             scan_types,
             user_id,
             auth,
-            job_timeout=SCAN_TIMEOUT_SECONDS,
+            scan_config,
+            job_timeout=job_timeout,
             description=f"zap_scan_task(scan_id={scan_id}, user_id={user_id})",
         )
     except Exception as exc:
@@ -585,7 +603,20 @@ def _parse_job_result(job_result: Any) -> Optional[Dict[str, Any]]:
     default_scan_type = scan_type_from_scan_types(scan_types)
 
     target_url = job_result.get("url") or (job_result.get("response") or {}).get("url")
-    return parse_zap_report(raw_report, default_scan_type=default_scan_type, default_target_url=target_url)
+    scan_config = job_result.get("scan_config") or (job_result.get("response") or {}).get("scan_config")
+    include_risks = None
+    scope_same_host_only = False
+    if isinstance(scan_config, dict):
+        alert_fetch = scan_config.get("alert_fetch") if isinstance(scan_config.get("alert_fetch"), dict) else {}
+        include_risks = alert_fetch.get("include_risks") if isinstance(alert_fetch, dict) else None
+        scope_same_host_only = bool(scan_config.get("scope_same_host_only"))
+    return parse_zap_report(
+        raw_report,
+        default_scan_type=default_scan_type,
+        default_target_url=target_url,
+        include_risks=include_risks,
+        scope_same_host_only=scope_same_host_only,
+    )
 
 
 def _extract_raw_report(job_result: Any) -> Optional[Dict[str, Any]]:
@@ -608,6 +639,20 @@ def _extract_auth_status(job_result: Any) -> Optional[Dict[str, Any]]:
     return status if isinstance(status, dict) else None
 
 
+def _attach_scan_meta(parsed: Optional[Dict[str, Any]], scan: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not isinstance(parsed, dict) or not isinstance(scan, dict):
+        return parsed
+    merged = dict(parsed)
+    merged["scanStatus"] = scan.get("status")
+    if scan.get("error"):
+        merged["scanError"] = scan.get("error")
+    if scan.get("progress_phase"):
+        merged["progressPhase"] = scan.get("progress_phase")
+    if scan.get("scan_config") is not None:
+        merged["scanConfig"] = scan.get("scan_config")
+    return merged
+
+
 # --- RQ結果取得 ---
 @app.get("/scan-result/{job_id}")
 def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
@@ -626,10 +671,11 @@ def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
             "progress": scan.get("progress_percent"),
         }
 
-    if scan.get("status") == "finished" and scan.get("parsed_report"):
+    if scan.get("status") in {"finished", "stopped"} and scan.get("parsed_report"):
+        result = _attach_scan_meta(scan["parsed_report"], scan)
         return {
             "status": "finished",
-            "result": scan["parsed_report"],
+            "result": result,
             "progress": scan.get("progress_percent", 100),
         }
 
@@ -664,8 +710,15 @@ def get_scan_result(job_id: str, user: Dict[str, Any] = Depends(require_auth)):
         auth_status = _extract_auth_status(job.result)
         if isinstance(auth_status, dict):
             parsed["authStatus"] = auth_status
-        _update_scan_result(scan["id"], user_id, "finished", raw_report, parsed, None, progress_percent=100)
-        return {"status": status, "result": parsed, "progress": 100}
+        scan_status = job.result.get("scan_status") if isinstance(job.result, dict) else None
+        scan_error = job.result.get("error") if isinstance(job.result, dict) else None
+        final_status = "stopped" if scan_status == "stopped" else "finished"
+        final_error = "stopped_by_timeout" if final_status == "stopped" else None
+        if scan_error and final_status == "stopped":
+            final_error = scan_error
+        parsed_with_meta = _attach_scan_meta(parsed, {**scan, "status": final_status, "error": final_error})
+        _update_scan_result(scan["id"], user_id, final_status, raw_report, parsed_with_meta, final_error, progress_percent=100)
+        return {"status": "finished", "result": parsed_with_meta, "progress": 100}
 
     return {
         "status": status,

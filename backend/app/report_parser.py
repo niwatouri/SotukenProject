@@ -7,7 +7,7 @@ Severity = str
 
 # ZAPのriskcodeをUI側のseverityにマップ
 _SEVERITY_MAP = {
-    0: "low",
+    0: "info",
     1: "low",
     2: "medium",
     3: "high",
@@ -15,6 +15,7 @@ _SEVERITY_MAP = {
 
 # 簡易スコア算出用の重み
 _SEVERITY_WEIGHT = {
+    "info": 0,
     "low": 10,
     "medium": 20,
     "high": 30,
@@ -30,6 +31,12 @@ _CONFIDENCE_MAP = {
 
 
 def _map_severity(riskcode: Any) -> Severity:
+    if isinstance(riskcode, str):
+        lowered = riskcode.strip().lower()
+        if lowered in {"informational", "info"}:
+            return "info"
+        if lowered in {"low", "medium", "high"}:
+            return lowered
     try:
         code = int(riskcode)
     except (TypeError, ValueError):
@@ -141,7 +148,13 @@ def build_alert_key(plugin_id: str, affected_url: Optional[str], parameter: Opti
     return "|".join(parts)
 
 
-def parse_zap_report(raw_json: Dict[str, Any], default_scan_type: str = "bulk", default_target_url: Optional[str] = None) -> Dict[str, Any]:
+def parse_zap_report(
+    raw_json: Dict[str, Any],
+    default_scan_type: str = "bulk",
+    default_target_url: Optional[str] = None,
+    include_risks: Optional[list[str]] = None,
+    scope_same_host_only: bool = False,
+) -> Dict[str, Any]:
     """
     ZAPのJSONレポートをフロントのScanResults形式に変換する。
     """
@@ -152,6 +165,7 @@ def parse_zap_report(raw_json: Dict[str, Any], default_scan_type: str = "bulk", 
     vulnerabilities: List[Dict[str, Any]] = []
     open_ports: set[int] = set()
     target_url = default_target_url or ""
+    target_host = urlparse(target_url).netloc if target_url else ""
 
     for site_index, site in enumerate(sites):
         site_name = site.get("@name") or site.get("name")
@@ -261,6 +275,32 @@ def parse_zap_report(raw_json: Dict[str, Any], default_scan_type: str = "bulk", 
         port_from_target = _extract_port_from_uri(target_url)
         if port_from_target:
             open_ports.add(port_from_target)
+
+    if include_risks:
+        allowed = {risk.strip().lower() for risk in include_risks if isinstance(risk, str)}
+        normalized_allowed = set()
+        for risk in allowed:
+            if risk == "informational":
+                normalized_allowed.add("info")
+            elif risk:
+                normalized_allowed.add(risk)
+        vulnerabilities = [v for v in vulnerabilities if v.get("severity") in normalized_allowed]
+
+    if scope_same_host_only and target_host:
+        filtered: List[Dict[str, Any]] = []
+        for vuln in vulnerabilities:
+            evidence = vuln.get("evidence") or {}
+            affected_url = evidence.get("affected_url")
+            if not affected_url:
+                filtered.append(vuln)
+                continue
+            try:
+                affected_host = urlparse(affected_url).netloc
+            except Exception:
+                affected_host = ""
+            if not affected_host or affected_host == target_host:
+                filtered.append(vuln)
+        vulnerabilities = filtered
 
     severity_score = sum(_SEVERITY_WEIGHT.get(v["severity"], 0) for v in vulnerabilities)
     risk_score = min(severity_score, 100) if vulnerabilities else 0

@@ -20,17 +20,21 @@ SCAN_SCHEMA_STATEMENTS = [
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       target_url TEXT NOT NULL,
       scan_types JSONB NOT NULL,
+      scan_config JSONB,
       status TEXT NOT NULL,
       job_id TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       started_at TIMESTAMPTZ,
       completed_at TIMESTAMPTZ,
       progress_percent INTEGER NOT NULL DEFAULT 0,
+      progress_phase TEXT,
       error TEXT,
       raw_report JSONB,
       parsed_report JSONB
     )
     """,
+    "ALTER TABLE scans ADD COLUMN IF NOT EXISTS scan_config JSONB",
+    "ALTER TABLE scans ADD COLUMN IF NOT EXISTS progress_phase TEXT",
     """
     CREATE TABLE IF NOT EXISTS ai_summaries (
       id SERIAL PRIMARY KEY,
