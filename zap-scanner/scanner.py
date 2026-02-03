@@ -4,7 +4,7 @@ import socket
 import threading
 import time
 import urllib.request
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlparse, urlencode
 
 from flask import Flask, request, jsonify
 from zapv2 import ZAPv2
@@ -316,6 +316,121 @@ def _normalize_scan_id(value):
     if isinstance(value, dict):
         value = value.get("scanId") or value.get("scan_id") or value.get("id") or value.get("scan")
     return _normalize_numeric_id(value)
+
+
+_MASK_KV_PATTERN = re.compile(r"(?i)(token|apikey|api_key|api-key|password|passwd|secret)=([^\s&]+)")
+
+
+def _zap_api_get_json(path: str, params: dict, timeout: float = 5.0):
+    base = "http://127.0.0.1:8090"
+    query = urlencode({k: v for k, v in params.items() if v is not None})
+    url = f"{base}{path}?{query}"
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        payload = response.read()
+    return json.loads(payload.decode("utf-8"))
+
+
+def _mask_sensitive_line(line: str) -> str:
+    lowered = line.lower()
+    if lowered.startswith("authorization:") or lowered.startswith("cookie:") or lowered.startswith("set-cookie:"):
+        key = line.split(":", 1)[0]
+        return f"{key}: <redacted>"
+    return _MASK_KV_PATTERN.sub(r"\1=<redacted>", line)
+
+
+def _mask_sensitive_text(value, max_chars: int) -> str:
+    if value is None:
+        return ""
+    text = str(value)
+    if not text:
+        return ""
+    lines = text.splitlines()
+    masked = "\n".join(_mask_sensitive_line(line) for line in lines)
+    if len(masked) <= max_chars:
+        return masked
+    return masked[: max_chars - 1] + "…"
+
+
+def _fetch_zap_message(message_id: str):
+    # /JSON/core/view/message/?id=<messageId>&apikey=<key>
+    params = {"id": message_id}
+    if ZAP_API_KEY:
+        params["apikey"] = ZAP_API_KEY
+    try:
+        data = _zap_api_get_json("/JSON/core/view/message/", params, timeout=6.0)
+    except Exception:
+        return None
+    message = data.get("message") if isinstance(data, dict) else None
+    return message if isinstance(message, dict) else None
+
+
+def _pick_best_instance(instances):
+    if not isinstance(instances, list) or not instances:
+        return None
+    for inst in instances:
+        if isinstance(inst, dict) and (inst.get("evidence") or inst.get("attack") or inst.get("param")):
+            return inst
+    for inst in instances:
+        if isinstance(inst, dict):
+            return inst
+    return None
+
+
+def _inject_http_messages(report_json: dict, max_alerts: int = 200) -> None:
+    """
+    ZAPのjsonreportにはrequest/responseが含まれないことがあるため、
+    instances[].id を messageId とみなし core/view/message で補完する。
+    バックエンド側は best instance しか参照しないため、各alertにつき1件だけ補完する。
+    """
+    if not isinstance(report_json, dict):
+        return
+    sites = report_json.get("site")
+    if isinstance(sites, dict):
+        sites = [sites]
+    if not isinstance(sites, list):
+        return
+
+    cache = {}
+    fetched = 0
+
+    for site in sites:
+        if not isinstance(site, dict):
+            continue
+        alerts = site.get("alerts") or []
+        if not isinstance(alerts, list):
+            continue
+        for alert in alerts:
+            if not isinstance(alert, dict):
+                continue
+            instances = alert.get("instances") or []
+            if isinstance(instances, dict):
+                instances = [instances]
+            if not isinstance(instances, list) or not instances:
+                continue
+            best = _pick_best_instance(instances)
+            if not isinstance(best, dict):
+                continue
+            message_id = _normalize_numeric_id(best.get("id"))
+            if not message_id:
+                continue
+
+            message = cache.get(message_id)
+            if message_id not in cache:
+                if fetched >= max_alerts:
+                    cache[message_id] = None
+                    continue
+                message = _fetch_zap_message(message_id)
+                cache[message_id] = message
+                fetched += 1
+
+            if not isinstance(message, dict):
+                continue
+
+            # Mask and truncate to avoid storing secrets / huge payloads.
+            best["requestHeader"] = _mask_sensitive_text(message.get("requestHeader"), max_chars=8000)
+            best["requestBody"] = _mask_sensitive_text(message.get("requestBody"), max_chars=12000)
+            best["responseHeader"] = _mask_sensitive_text(message.get("responseHeader"), max_chars=8000)
+            best["responseBody"] = _mask_sensitive_text(message.get("responseBody"), max_chars=12000)
 
 
 def _safe_stop_scan(stop_func, scan_id):
@@ -854,6 +969,8 @@ def scan():
     if rule_suffix == "noid":
         rule_suffix = f"{rule_suffix}-{int(time.time() * 1000)}"
 
+    report = json.dumps({"site": []})
+
     try:
         report_progress(5, "starting")
         _cleanup_replacer_rules("scan-auth-")
@@ -1133,6 +1250,55 @@ def scan():
                 if timebox_exceeded():
                     mark_stopped()
 
+        report_progress(99, "collecting_alerts")
+        report_json = None
+        report_payload = None
+        if port_scan_only:
+            report_json = {"site": []}
+            _ensure_site_entry(report_json, target)
+        else:
+            report_payload = zap.core.jsonreport(apikey=ZAP_API_KEY)
+            try:
+                report_json = json.loads(report_payload)
+            except json.JSONDecodeError:
+                report_json = None
+
+        if port_scan_requested:
+            if report_json is None:
+                report_json = {"site": []}
+                _ensure_site_entry(report_json, target)
+            _inject_port_scan_alerts(report_json, target, port_scan_results)
+
+        if isinstance(report_json, dict):
+            _inject_http_messages(report_json)
+            report_payload = json.dumps(report_json)
+
+        report = report_payload if report_payload is not None else json.dumps({"site": []})
+
+        json_path, xml_path, html_path = _build_report_paths(scan_id)
+
+        # JSONレポートをファイル保存（任意）
+        with open(json_path, 'w') as f:
+            f.write(report)
+
+        try:
+            xml_report = zap.core.xmlreport(apikey=ZAP_API_KEY)
+        except Exception:
+            xml_report = None
+
+        if xml_report:
+            with open(xml_path, 'w') as f:
+                f.write(xml_report)
+
+        try:
+            html_report = zap.core.htmlreport(apikey=ZAP_API_KEY)
+        except Exception:
+            html_report = None
+
+        if html_report:
+            with open(html_path, 'w') as f:
+                f.write(html_report)
+
     finally:
         for rule_id in replacer_rules:
             try:
@@ -1151,53 +1317,6 @@ def scan():
                 pass
         if lock_acquired:
             SCAN_LOCK.release()
-
-    report_progress(99, "collecting_alerts")
-    report_json = None
-    report_payload = None
-    if port_scan_only:
-        report_json = {"site": []}
-        _ensure_site_entry(report_json, target)
-        report_payload = json.dumps(report_json)
-    else:
-        report_payload = zap.core.jsonreport(apikey=ZAP_API_KEY)
-        try:
-            report_json = json.loads(report_payload)
-        except json.JSONDecodeError:
-            report_json = None
-
-    if port_scan_requested:
-        if report_json is None:
-            report_json = {"site": []}
-            _ensure_site_entry(report_json, target)
-        _inject_port_scan_alerts(report_json, target, port_scan_results)
-        report_payload = json.dumps(report_json)
-
-    report = report_payload if report_payload is not None else json.dumps({"site": []})
-
-    json_path, xml_path, html_path = _build_report_paths(scan_id)
-
-    # JSONレポートをファイル保存（任意）
-    with open(json_path, 'w') as f:
-        f.write(report)
-
-    try:
-        xml_report = zap.core.xmlreport(apikey=ZAP_API_KEY)
-    except Exception:
-        xml_report = None
-
-    if xml_report:
-        with open(xml_path, 'w') as f:
-            f.write(xml_report)
-
-    try:
-        html_report = zap.core.htmlreport(apikey=ZAP_API_KEY)
-    except Exception:
-        html_report = None
-
-    if html_report:
-        with open(html_path, 'w') as f:
-            f.write(html_report)
 
     final_status = "stopped" if stopped_by_timeout else "finished"
     final_error = "stopped_by_timeout" if stopped_by_timeout else None
