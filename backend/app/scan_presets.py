@@ -34,8 +34,8 @@ SCAN_PRESETS: Dict[str, Dict[str, Any]] = {
         "scope_same_host_only": True,
         "spider": {
             "max_depth": 5,
-            "max_children": 60,
-            "max_duration_seconds": 120,
+            "max_children": 120,
+            "max_duration_seconds": 180,
         },
         "active_scan": {
             "enabled": True,
