@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Shield, AlertTriangle, Activity, Globe, Download, Brain, Home, Clock, Target, BarChart3, CheckCircle, Lightbulb } from 'lucide-react';
+import { Shield, AlertTriangle, Activity, Globe, Download, Home, Clock, Target } from 'lucide-react';
 import { ScanHistoryItem, useScan, VulnerabilityData } from '../contexts/ScanContext';
-import { getAnalysisData, getPriorityColor, getRiskColor } from '../utils/analysis';
+import { getAnalysisData, getRiskColor } from '../utils/analysis';
 import { AI_GENERAL_LABEL, normalizeAiSteps, normalizeAiText, stripHtml } from '../utils/text';
 import { useAuth } from '../contexts/AuthContext';
 import { jsPDF } from 'jspdf';
@@ -74,19 +74,6 @@ const getPriorityFromSeverity = (severity?: VulnerabilityData['severity']): 'hig
       return 'low';
     default:
       return 'low';
-  }
-};
-
-const getPriorityLabel = (priority: string) => {
-  switch (priority) {
-    case 'high':
-      return '高';
-    case 'medium':
-      return '中';
-    case 'low':
-      return '低';
-    default:
-      return priority.toUpperCase();
   }
 };
 
@@ -208,6 +195,14 @@ const normalizeAiStatus = (value: any): AISummaryStatus => {
   }
 };
 
+const toJapaneseText = (value?: string | null) => {
+  if (!value) {
+    return '';
+  }
+  const normalized = normalizeAiText(value);
+  return /[一-龠ぁ-んァ-ン]/.test(normalized) ? normalized : '';
+};
+
 const trimSnippet = (snippet?: string[] | null) => {
   if (!Array.isArray(snippet)) {
     return [];
@@ -219,7 +214,6 @@ function Dashboard() {
   const { scanResults, scanId, loadScanById, loadScanHistory } = useScan();
   const { logout, user } = useAuth();
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState<'dashboard' | 'ai'>('dashboard');
   const [historyScans, setHistoryScans] = useState<ScanHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -233,7 +227,7 @@ function Dashboard() {
   // Scroll to top when component mounts or view changes
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [activeView]);
+  }, []);
 
   useEffect(() => {
     if (scanResults) {
@@ -966,38 +960,7 @@ function Dashboard() {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto px-4 py-8">
-        {/* View Toggle */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="bg-white rounded-xl shadow-lg p-2 border border-slate-200">
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setActiveView('dashboard')}
-                className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
-                  activeView === 'dashboard'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
-                }`}
-              >
-                <BarChart3 className="w-5 h-5" />
-                <span>ダッシュボード</span>
-              </button>
-              <button
-                onClick={() => setActiveView('ai')}
-                className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
-                  activeView === 'ai'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
-                }`}
-              >
-                <Brain className="w-5 h-5" />
-                <span>AI解析</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {activeView === 'dashboard' ? (
-          <div key="dashboard-content">
+        <div key="dashboard-content">
             {authStatus?.used && (
               <div className={`mb-6 flex items-start space-x-3 rounded-xl border px-4 py-3 ${authStatusClass}`}>
                 <AlertTriangle className="mt-0.5 h-5 w-5" />
@@ -1142,6 +1105,24 @@ function Dashboard() {
               </div>
             </div>
 
+            {/* Risk Assessment */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-slate-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">リスク評価</h3>
+              <div className={`p-4 rounded-lg border-2 ${getRiskColor(analysisData.overallRisk)}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-base font-semibold mb-1">総合リスクレベル</h4>
+                    <p className="text-sm">
+                      {analysisData.overallRisk === 'high' && '緊急対応が必要です'}
+                      {analysisData.overallRisk === 'medium' && '早期対応を推奨します'}
+                      {analysisData.overallRisk === 'low' && '継続的な監視が必要です'}
+                    </p>
+                  </div>
+                  <div className="text-xl font-bold uppercase">{overallRiskLabel}</div>
+                </div>
+              </div>
+            </div>
+
             {/* Open Ports */}
             <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-slate-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">開放ポート</h3>
@@ -1183,18 +1164,25 @@ function Dashboard() {
                   const title = advice?.title
                     ? normalizeAiText(advice.title)
                     : (vuln.type || '脆弱性項目');
-                  const description = status === 'completed'
-                    ? (advice?.summary ? normalizeAiText(advice.summary) : aiMissingSummaryText)
-                    : statusMessage;
-                  const impact = status === 'completed'
-                    ? (advice?.impact ? normalizeAiText(advice.impact) : aiMissingImpactText)
-                    : statusMessage;
+                  const fallbackSummary = toJapaneseText(vuln.description || '');
+                  const fallbackImpact = toJapaneseText(vuln.impact || '');
+                  const fallbackSolution = toJapaneseText(vuln.solution || '');
+                  const aiSummary = toJapaneseText(advice?.summary);
+                  const summaryLine = status === 'completed'
+                    ? (aiSummary || aiMissingSummaryText)
+                    : (fallbackSummary || statusMessage);
+                  const technicalExplanation = status === 'completed'
+                    ? (aiSummary || aiMissingSummaryText)
+                    : (fallbackImpact || fallbackSummary || statusMessage);
                   const steps = status === 'completed' && Array.isArray(advice?.steps)
-                    ? normalizeAiSteps(advice.steps)
+                    ? normalizeAiSteps(advice.steps).map((step) => toJapaneseText(step)).filter(Boolean)
                     : [];
-                  const solutionText = status === 'completed'
-                    ? (steps.length > 0 ? steps.join(' / ') : aiMissingStepsText)
-                    : statusMessage;
+                  const improvementList = steps.length > 0
+                    ? steps
+                    : [fallbackSolution || statusMessage];
+                  const analogyFromAi = status === 'completed' && advice?.analogy ? toJapaneseText(advice.analogy) : '';
+                  const analogyText = analogyFromAi || getFallbackAnalogy(vuln.type || '') || 'AI解析の例えがありません。';
+                  const showAiStatus = Boolean(advice) || isLoadingAdvice;
                   const evidence = vuln.evidence;
                   const hasEvidence = !!(evidence && (
                     evidence.affected_url ||
@@ -1221,9 +1209,11 @@ function Dashboard() {
                           >
                             {getSeverityLabel(vuln.severity)}
                           </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getAiStatusTone(status)}`}>
-                            {getAiStatusLabel(status)}
-                          </span>
+                          {showAiStatus && (
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getAiStatusTone(status)}`}>
+                              {getAiStatusLabel(status)}
+                            </span>
+                          )}
                           {vuln.cveId && (
                             <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
                               {vuln.cveId}
@@ -1233,23 +1223,32 @@ function Dashboard() {
                         <span className="text-sm text-gray-600">ポート {vuln.port}</span>
                       </div>
 
-                      {status === 'completed' && (
-                        <p className="text-xs text-gray-500 mb-2">{AI_GENERAL_LABEL}</p>
-                      )}
-                      <p className="text-gray-700 mb-3">{description}</p>
+                      <p className="text-gray-700 mb-3">{summaryLine}</p>
                       {status === 'failed' && advice?.error_reason && (
                         <p className="text-xs text-red-600 mb-2">失敗理由: {stripHtml(advice.error_reason)}</p>
                       )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
-                          <p className="font-medium text-gray-900 mb-1">影響:</p>
-                          <p className="text-gray-600">{impact}</p>
+                          <p className="font-medium text-gray-900 mb-1">技術的解説:</p>
+                          {status === 'completed' && (
+                            <p className="text-xs text-gray-500 mb-1">{AI_GENERAL_LABEL}</p>
+                          )}
+                          <p className="text-gray-600">{technicalExplanation}</p>
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 mb-1">対策:</p>
-                          <p className="text-gray-600">{solutionText}</p>
+                          <p className="font-medium text-gray-900 mb-1">改善案:</p>
+                          <ul className="text-gray-600 list-disc list-inside space-y-1">
+                            {improvementList.map((step, stepIndex) => (
+                              <li key={`${alertKey}-step-${stepIndex}`}>{step}</li>
+                            ))}
+                          </ul>
                         </div>
+                      </div>
+
+                      <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="font-medium text-blue-900 mb-2">わかりやすい例え</p>
+                        <p className="text-blue-800 text-sm">{analogyText}</p>
                       </div>
 
                       {status === 'failed' && (
@@ -1334,179 +1333,6 @@ function Dashboard() {
               </div>
             </div>
           </div>
-        ) : (
-          <div key="ai-content">
-            {/* AI Analysis View */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
-              <div className="flex items-center space-x-4 mb-6">
-                <Brain className="w-12 h-12" />
-                <div>
-                  <h2 className="text-3xl font-bold">AI 分析結果</h2>
-                  <p className="text-purple-100">高度なアルゴリズムによる脆弱性解析</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-2xl font-bold">{totalVulnerabilities}件</div>
-                  <div className="text-purple-100">検出された脆弱性（合計）</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-2xl font-bold">{analysisData.criticalIssues}</div>
-                  <div className="text-purple-100">高リスク脆弱性</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <div className="text-2xl font-bold">{analysisData.mediumIssues}</div>
-                  <div className="text-purple-100">中リスク脆弱性</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Risk Assessment */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 border border-slate-200">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">リスク評価</h3>
-              
-              <div className={`p-6 rounded-lg border-2 ${getRiskColor(analysisData.overallRisk)} mb-6`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-lg font-semibold mb-2">総合リスクレベル</h4>
-                    <p className="text-sm">
-                      {analysisData.overallRisk === 'high' && '緊急対応が必要です'}
-                      {analysisData.overallRisk === 'medium' && '早期対応を推奨します'}
-                      {analysisData.overallRisk === 'low' && '継続的な監視が必要です'}
-                    </p>
-                  </div>
-                  <div className="text-2xl font-bold uppercase">
-                    {overallRiskLabel}
-                  </div>
-                </div>
-              </div>
-
-              {analysisData.mostCritical && (
-                <div className="border-l-4 border-red-500 bg-red-50 p-6 rounded-r-lg">
-                  <h4 className="text-lg font-semibold text-red-900 mb-2">最優先対応項目</h4>
-                  <div className="text-red-800">
-                    <p className="font-medium">{mostCriticalTitle}</p>
-                    <p className="text-sm mt-1">{mostCriticalSummary}</p>
-                    {mostCriticalImpact && (
-                      <p className="text-sm mt-2"><strong>影響:</strong> {mostCriticalImpact}</p>
-                    )}
-                    <div className="mt-3 flex items-center space-x-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      <span className="text-sm font-medium">ポート {analysisData.mostCritical.port} で検出</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* AI Recommendations */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 border border-slate-200">
-              <div className="flex items-center space-x-3 mb-6">
-                <Lightbulb className="w-6 h-6 text-yellow-600" />
-                <h3 className="text-2xl font-bold text-gray-900">AI 推奨改善策</h3>
-              </div>
-              
-              <div className="space-y-6">
-                {recommendations.map((rec, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                    <div className="flex items-start space-x-4">
-                      <div className={`w-3 h-3 rounded-full ${getPriorityColor(rec.priority)} mt-2`}></div>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-3">
-                          <h4 className="text-lg font-semibold text-gray-900">{rec.title}</h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getPriorityColor(rec.priority)}`}>
-                            {getPriorityLabel(rec.priority)}
-                          </span>
-                        </div>
-                        <p className="text-gray-700 mb-3">{rec.description}</p>
-                        <div className="flex items-center space-x-2 text-sm text-green-600">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="font-medium">期待効果:</span>
-                          <span>{rec.impact}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Detailed Analysis */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 border border-slate-200">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">詳細分析と解説</h3>
-              
-              <div className="space-y-8">
-                {scanResults.vulnerabilities.slice(0, 3).map((vuln, index) => {
-                  const alertKey = vuln.alertKey ?? vuln.id;
-                  const advice = adviceByKey.get(alertKey) || adviceById.get(vuln.id);
-                  const status = advice?.status ?? (isLoadingAdvice ? 'processing' : 'pending');
-                  const statusMessage = getAiStatusMessage(status);
-                  const title = advice?.title
-                    ? normalizeAiText(advice.title)
-                    : (vuln.type || '脆弱性項目');
-                  const summary = status === 'completed'
-                    ? (advice?.summary ? normalizeAiText(advice.summary) : aiMissingSummaryText)
-                    : statusMessage;
-                  const impact = status === 'completed'
-                    ? (advice?.impact ? normalizeAiText(advice.impact) : aiMissingImpactText)
-                    : statusMessage;
-                  const steps = status === 'completed' && Array.isArray(advice?.steps)
-                    ? normalizeAiSteps(advice.steps)
-                    : [];
-                  const analogyFromAi = status === 'completed' && advice?.analogy ? normalizeAiText(advice.analogy) : '';
-                  const analogy = status === 'completed' ? (analogyFromAi || getFallbackAnalogy(vuln.type)) : '';
-
-                  return (
-                    <div key={`${vuln.id}-${index}`} className="border-b border-gray-200 pb-8 last:border-b-0 last:pb-0">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <span className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-semibold text-sm">
-                        {index + 1}
-                      </span>
-                      <h4 className="text-xl font-semibold text-gray-900">{title}</h4>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div>
-                        <h5 className="font-semibold text-gray-900 mb-3">技術的解説</h5>
-                        {status === 'completed' && (
-                          <p className="text-xs text-gray-500 mb-2">{AI_GENERAL_LABEL}</p>
-                        )}
-                        <p className="text-gray-700 mb-4">{summary}</p>
-                        <p className="text-gray-700"><strong>影響:</strong> {impact}</p>
-                      </div>
-                      
-                      <div>
-                        <h5 className="font-semibold text-gray-900 mb-3">改善案</h5>
-                        {steps.length > 0 ? (
-                          <ul className="text-gray-700 mb-4 list-disc list-inside space-y-1">
-                            {steps.map((step, stepIndex) => (
-                              <li key={stepIndex}>{step}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-gray-700 mb-4">
-                            {status === 'completed' ? aiMissingStepsText : statusMessage}
-                          </p>
-                        )}
-                        
-                        {scanResults.scanType === 'bulk' && analogy && (
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <h6 className="font-medium text-blue-900 mb-2">💡 わかりやすい例え</h6>
-                            <p className="text-blue-800 text-sm">
-                              {analogy}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       <Footer />
