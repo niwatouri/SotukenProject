@@ -28,9 +28,7 @@ function Signup() {
     let strength = 0;
     if (password.length >= 8) strength++;
     if (/[A-Z]/.test(password)) strength++;
-    if (/[a-z]/.test(password)) strength++;
     if (/[0-9]/.test(password)) strength++;
-    if (/[^A-Za-z0-9]/.test(password)) strength++;
     return strength;
   };
 
@@ -39,9 +37,7 @@ function Signup() {
       case 0:
       case 1: return { text: '弱い', color: 'text-red-600' };
       case 2: return { text: '普通', color: 'text-orange-600' };
-      case 3: return { text: '良い', color: 'text-yellow-600' };
-      case 4:
-      case 5: return { text: '強い', color: 'text-green-600' };
+      case 3: return { text: '強い', color: 'text-green-600' };
       default: return { text: '', color: '' };
     }
   };
@@ -125,13 +121,12 @@ function Signup() {
                 <div className="mt-2">
                   <div className="flex items-center space-x-2">
                     <div className="flex-1 bg-gray-200 rounded-full h-2">
-                     <div
+                      <div
                         className={`h-2 rounded-full transition-all duration-300 ${
                           passwordStrength <= 1 ? 'bg-red-500' :
-                          passwordStrength === 2 ? 'bg-orange-500' :
-                          passwordStrength === 3 ? 'bg-yellow-500' : 'bg-green-500'
+                          passwordStrength === 2 ? 'bg-orange-500' : 'bg-green-500'
                         }`}
-                        style={{ width: `${(passwordStrength / 5) * 100}%` }}
+                        style={{ width: `${(passwordStrength / 3) * 100}%` }}
                       ></div>
                     </div>
                     <span className={`text-xs font-medium ${strengthInfo.color}`}>
@@ -253,7 +248,7 @@ function Signup() {
           </div>
 
           <div className="mt-4 text-center text-xs text-gray-500">
-            Demo: 有効なメールアドレス形式と8文字以上のパスワードで登録できます
+            Demo: 有効なメールアドレス形式と8文字以上・大文字・数字を含むパスワードで登録できます
           </div>
         </div>
       </div>

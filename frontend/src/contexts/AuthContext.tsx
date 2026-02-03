@@ -106,8 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (password !== confirmPassword) {
       return { success: false, error: 'パスワードが一致しません' };
     }
-    if (password.length < 8) {
-      return { success: false, error: 'パスワードは8文字以上で入力してください' };
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    if (password.length < 8 || !hasUppercase || !hasNumber) {
+      return { success: false, error: 'パスワードは8文字以上で、大文字と数字を含めてください' };
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {

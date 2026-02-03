@@ -30,6 +30,11 @@ app.post('/register', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'メールアドレスとパスワードは必須です' });
   }
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  if (password.length < 8 || !hasUppercase || !hasNumber) {
+    return res.status(400).json({ error: 'パスワードは8文字以上で、大文字と数字を含めてください' });
+  }
 
   try {
     const hash = await bcrypt.hash(password, 10);
